@@ -1,0 +1,246 @@
+export type Role = 'admin' | 'accountant' | 'staff';
+
+export interface Organization {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  industry?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
+  gstin?: string | null;
+  currency: string;
+  currency_symbol: string;
+  fiscal_year_start: number;
+  date_format?: string | null;
+  invoice_terms?: string | null;
+  invoice_notes?: string | null;
+}
+
+export interface User {
+  id: number;
+  organization_id: number;
+  name: string;
+  phone: string;
+  email?: string | null;
+  role: Role;
+  is_active: boolean;
+  last_login_at?: string | null;
+  organization?: Organization;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+export interface Paginated<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface Tax {
+  id: number;
+  name: string;
+  rate: number;
+  type?: string;
+  is_active?: boolean;
+}
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+
+export interface Account {
+  id: number;
+  code: string;
+  name: string;
+  type: AccountType;
+  sub_type?: string | null;
+  description?: string | null;
+  opening_balance?: number;
+  is_system?: boolean;
+  is_active?: boolean;
+}
+
+export type ContactType = 'customer' | 'vendor';
+
+export interface Contact {
+  id: number;
+  type: ContactType;
+  name: string;
+  company_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  gstin?: string | null;
+  pan?: string | null;
+  billing_address?: string | null;
+  shipping_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
+  opening_balance?: number;
+  payment_terms?: number;
+  notes?: string | null;
+  is_active?: boolean;
+  outstanding?: number | null;
+}
+
+export interface ContactDetail extends Contact {
+  summary: { outstanding: number; total_billed: number; total_paid: number };
+  recent_documents: DocumentSummary[];
+}
+
+export interface Item {
+  id: number;
+  name: string;
+  sku?: string | null;
+  type: 'goods' | 'service';
+  unit?: string | null;
+  hsn_code?: string | null;
+  category?: string | null;
+  description?: string | null;
+  sales_price: number;
+  purchase_price?: number;
+  tax_id?: number | null;
+  tax?: Pick<Tax, 'id' | 'name' | 'rate'> | null;
+  track_inventory?: boolean;
+  stock_on_hand?: number;
+  reorder_level?: number;
+  is_active?: boolean;
+}
+
+export type DocumentType = 'estimate' | 'sales_order' | 'invoice' | 'credit_note' | 'purchase_order' | 'bill';
+
+export interface DocumentLine {
+  id?: number;
+  item_id?: number | null;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unit?: string | null;
+  rate: number;
+  discount_percent?: number;
+  tax_id?: number | null;
+  tax_rate?: number;
+  tax_amount?: number;
+  amount?: number;
+}
+
+export interface DocumentSummary {
+  id: number;
+  type: DocumentType;
+  number: string;
+  date: string;
+  due_date?: string | null;
+  total: number;
+  balance: number;
+  status: string;
+  contact_id?: number;
+  contact?: Pick<Contact, 'id' | 'name' | 'company_name'>;
+}
+
+export interface Document extends DocumentSummary {
+  reference?: string | null;
+  contact_id: number;
+  subtotal: number;
+  discount: number;
+  tax_total: number;
+  adjustment: number;
+  amount_paid: number;
+  notes?: string | null;
+  terms?: string | null;
+  converted_from_id?: number | null;
+  converted_from?: { id: number; type: DocumentType; number: string } | null;
+  contact?: Contact;
+  items?: DocumentLine[];
+  payments?: Payment[];
+}
+
+export type PaymentMode = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'card' | 'other';
+
+export interface Payment {
+  id: number;
+  direction: 'in' | 'out';
+  number: string;
+  contact_id: number;
+  document_id?: number | null;
+  account_id?: number | null;
+  date: string;
+  amount: number;
+  mode: PaymentMode;
+  reference?: string | null;
+  notes?: string | null;
+  contact?: Pick<Contact, 'id' | 'name'>;
+  document?: Pick<Document, 'id' | 'type' | 'number'> | null;
+  account?: Pick<Account, 'id' | 'name'> | null;
+}
+
+export interface Expense {
+  id: number;
+  date: string;
+  account_id: number;
+  paid_through_id?: number | null;
+  contact_id?: number | null;
+  amount: number;
+  tax_id?: number | null;
+  tax_amount: number;
+  total: number;
+  reference?: string | null;
+  description?: string | null;
+  account?: Pick<Account, 'id' | 'name'>;
+  paid_through?: Pick<Account, 'id' | 'name'> | null;
+  contact?: Pick<Contact, 'id' | 'name'> | null;
+}
+
+export interface JournalLine {
+  account_id: number;
+  description?: string | null;
+  debit: number;
+  credit: number;
+  account?: Pick<Account, 'id' | 'code' | 'name'>;
+}
+
+export interface Journal {
+  id: number;
+  number: string;
+  date: string;
+  reference?: string | null;
+  notes?: string | null;
+  total: number;
+  lines_count?: number;
+  lines?: JournalLine[];
+}
+
+export interface Lookups {
+  taxes: Tax[];
+  accounts: Account[];
+  payment_modes: PaymentMode[];
+  units: string[];
+  statuses: Record<DocumentType, string[]>;
+}
+
+export interface Dashboard {
+  receivable: number;
+  payable: number;
+  overdue_receivable: number;
+  overdue_payable: number;
+  sales_this_month: number;
+  expenses_this_month: number;
+  received_this_month: number;
+  counts: { customers: number; vendors: number; items: number; unpaid_invoices: number };
+  trend: { month: string; sales: number; expenses: number }[];
+  top_customers: { id: number; name: string; total: number }[];
+  recent: DocumentSummary[];
+  low_stock: Pick<Item, 'id' | 'name' | 'sku' | 'stock_on_hand' | 'reorder_level' | 'unit'>[];
+}
+
+export interface ReportLine {
+  name: string;
+  amount: number;
+}

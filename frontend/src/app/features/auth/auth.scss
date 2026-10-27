@@ -1,0 +1,72 @@
+:host {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+  background: var(--surface);
+}
+.panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+.form {
+  width: 100%;
+  max-width: 400px;
+  display: grid;
+  gap: 18px;
+}
+.form h1 {
+  font-size: 26px;
+}
+.input-icon {
+  position: relative;
+}
+.input-icon app-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+}
+.input-icon .input {
+  padding-left: 38px;
+  height: 44px;
+}
+.toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.btn--lg {
+  height: 46px;
+  font-size: 15px;
+}
+.switch {
+  text-align: center;
+  color: var(--muted);
+}
+.demo {
+  font-size: 12.5px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+@media (max-width: 900px) {
+  :host {
+    grid-template-columns: 1fr;
+  }
+  app-auth-hero {
+    display: none;
+  }
+}

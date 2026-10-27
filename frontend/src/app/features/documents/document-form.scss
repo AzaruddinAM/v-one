@@ -1,0 +1,72 @@
+.head {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.lines .table td {
+  vertical-align: top;
+  padding: 10px 8px;
+}
+.lines .table th {
+  padding: 10px 8px;
+}
+.lines .table td:first-child,
+.lines .table th:first-child {
+  padding-left: 20px;
+}
+.desc {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.lines .text-right {
+  text-align: right;
+}
+.lines td.mono {
+  padding-top: 18px;
+}
+.bottom {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 32px;
+  border-top: 1px solid var(--border);
+}
+.summary {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: grid;
+  gap: 10px;
+  align-self: start;
+}
+.summary .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.summary .row .input {
+  width: 140px;
+}
+.summary .total {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.actions-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  padding: 14px 0;
+  margin-top: 8px;
+  background: linear-gradient(transparent, var(--bg) 30%);
+  z-index: 5;
+}
+@media (max-width: 1000px) {
+  .head {
+    grid-template-columns: 1fr 1fr;
+  }
+  .bottom {
+    grid-template-columns: 1fr;
+  }
+}

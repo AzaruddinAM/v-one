@@ -1,0 +1,55 @@
+
+:host {
+  position: relative;
+  overflow: hidden;
+  padding: 48px 56px;
+  color: #e0e7ff;
+  background:
+    radial-gradient(1200px 500px at -10% -10%, rgba(14, 165, 233, 0.35), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(99, 102, 241, 0.55), transparent 60%),
+    #0f172a;
+  display: flex;
+  flex-direction: column;
+}
+.hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  font-weight: 750;
+  color: #fff;
+}
+.hero__body {
+  margin: auto 0;
+  max-width: 460px;
+}
+h2 {
+  font-size: 34px;
+  line-height: 1.15;
+  color: #fff;
+  letter-spacing: -0.03em;
+}
+p {
+  margin-top: 14px;
+  font-size: 15.5px;
+  color: #c7d2fe;
+}
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 28px 0 0;
+  display: grid;
+  gap: 12px;
+}
+li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+li app-icon {
+  color: #67e8f9;
+}
+.hero__foot {
+  font-size: 12.5px;
+  color: #94a3b8;
+}
