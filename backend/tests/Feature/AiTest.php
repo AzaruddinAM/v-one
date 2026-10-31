@@ -7,6 +7,7 @@ use App\Models\Contact;
 use App\Models\Document;
 use App\Models\Item;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -196,19 +197,18 @@ class AiTest extends TestCase
         $retired = fn (string $m) => Http::response(['error' => ['message' => "This model models/$m is no longer available to new users."]], 404);
         Http::fake([
             '*gemini-2.5-flash-lite:generateContent' => $retired('gemini-2.5-flash-lite'),
-            '*gemini-flash-latest:generateContent' => $retired('gemini-flash-latest'),
-            '*gemini-3.5-flash:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+            '*gemini-3.5-flash-lite:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
         ]);
 
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
             ->assertOk()->assertJsonPath('reply', 'Hello!');
-        Http::assertSentCount(3);
-        Http::assertSent(fn ($r) => str_contains($r->url(), 'gemini-3.5-flash:')
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'gemini-3.5-flash-lite:')
             && $r['generationConfig']['thinkingConfig']['thinkingLevel'] === 'low');
 
         // The next question goes straight to the model that worked.
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi again']]])->assertOk();
-        Http::assertSentCount(4);
+        Http::assertSentCount(3);
     }
 
     #[Test]
@@ -243,11 +243,34 @@ class AiTest extends TestCase
         config(['services.gemini.model' => 'gemini-3.5-flash']);
         Http::fake([
             '*gemini-3.5-flash:generateContent' => Http::response(['error' => ['message' => 'This model is currently experiencing high demand.']], 503),
-            '*gemini-flash-latest:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+            '*gemini-3.5-flash-lite:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
         ]);
 
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
             ->assertOk()->assertJsonPath('reply', 'Hello!');
+    }
+
+    #[Test]
+    public function a_model_that_does_not_answer_in_time_falls_back_to_a_lighter_one(): void
+    {
+        config(['services.gemini.model' => 'gemini-3.5-flash']);
+        Http::fake([
+            '*gemini-3.5-flash:generateContent' => fn () => throw new ConnectionException('cURL error 28: Operation timed out after 25001 milliseconds with 0 bytes received'),
+            '*gemini-3.5-flash-lite:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+        ]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertOk()->assertJsonPath('reply', 'Hello!');
+    }
+
+    #[Test]
+    public function a_connection_that_cannot_be_opened_is_reported(): void
+    {
+        Http::fake(['*' => fn () => throw new ConnectionException('cURL error 7: Failed to connect to generativelanguage.googleapis.com port 443')]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'could not connect'));
     }
 
     #[Test]
@@ -258,6 +281,6 @@ class AiTest extends TestCase
 
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
             ->assertStatus(422)
-            ->assertJsonPath('message', fn ($m) => str_contains($m, 'gemini-3.5-flash, gemini-flash-latest'));
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'gemini-3.5-flash, gemini-3.5-flash-lite'));
     }
 }

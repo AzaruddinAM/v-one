@@ -21,6 +21,7 @@ class AiController extends Controller
     /** Step 1: read the uploaded bill with Gemini and return an editable preview (nothing is saved). */
     public function scanBill(Request $request, BillScanner $scanner)
     {
+        $this->allowTimeForGemini();
         $request->validate([
             'file' => ['required', 'file', 'max:10240', 'mimetypes:image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf'],
         ], ['file.mimetypes' => 'Upload a photo (JPG, PNG, WEBP, HEIC) or a PDF.']);
@@ -84,6 +85,7 @@ class AiController extends Controller
 
     public function chat(Request $request, AssistantService $assistant)
     {
+        $this->allowTimeForGemini();
         $data = $request->validate([
             'messages' => ['required', 'array', 'min:1', 'max:40'],
             'messages.*.role' => ['required', Rule::in(['user', 'model'])],
@@ -97,5 +99,13 @@ class AiController extends Controller
         abort_if(! $messages || end($messages)['role'] !== 'user', 422, 'The last message must be from the user.');
 
         return $assistant->chat($request->user()->load('organization'), $messages);
+    }
+
+    /** Shared hosts often stop PHP after 30s; Gemini calls get their own time budget (services.gemini.deadline). */
+    private function allowTimeForGemini(): void
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit((int) config('services.gemini.deadline', 55) + 15);
+        }
     }
 }

@@ -24,9 +24,11 @@ class GeminiClient
      * Tried in order when the configured model is unavailable for the key (Google retires
      * older models for new keys). The "-latest" aliases always point at a current model.
      */
-    private const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash'];
+    private const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-2.5-flash'];
 
     private ?string $workingModel = null;
+
+    private ?float $deadline = null;
 
     public function configured(): bool
     {
@@ -71,11 +73,26 @@ class GeminiClient
         $tried = [];
         $sawBusy = false;
 
+        // One time budget for the whole HTTP request (a chat answer may need several Gemini calls),
+        // so we always answer before the hosting proxy gives up and shows its own 502/504 page.
+        $this->deadline ??= microtime(true) + (int) config('services.gemini.deadline', 55);
+
         foreach ($models as $i => $model) {
+            if ($this->deadline - microtime(true) < 5) {
+                throw new AiException("Google's Gemini servers are responding too slowly right now (tried ".implode(', ', $tried ?: [$model]).'). Please try again in a minute.', 422);
+            }
             $tried[] = $model;
             $response = $this->send($model, $contents, $options, thinking: true);
-            if ($response->status() === 400 && preg_match('/thinking/i', (string) $response->json('error.message'))) {
+            if ($response?->status() === 400 && preg_match('/thinking/i', (string) $response->json('error.message'))) {
                 $response = $this->send($model, $contents, $options, thinking: false);
+            }
+            if ($response === null) {
+                // Connected, but no answer in time: the model is overloaded — a lighter one is usually faster.
+                $sawBusy = true;
+                if ($i < count($models) - 1) {
+                    continue;
+                }
+                throw new AiException("Google's Gemini servers are responding too slowly right now (tried ".implode(', ', $tried).'). Please try again in a minute.', 422);
             }
             if ($response->successful()) {
                 if ($this->workingModel !== $model) {
@@ -130,7 +147,8 @@ class GeminiClient
         return $content;
     }
 
-    private function send(string $model, array $contents, array $options, bool $thinking): Response
+    /** @return Response|null null when the connection worked but Gemini did not answer in time */
+    private function send(string $model, array $contents, array $options, bool $thinking): ?Response
     {
         $config = $options['generationConfig'] ?? [];
         // Newer models "think" before answering by default, which makes replies slow enough for shared hosting to time out.
@@ -148,15 +166,21 @@ class GeminiClient
             'toolConfig' => $options['toolConfig'] ?? null,
         ]);
 
+        $remaining = (int) floor($this->deadline - microtime(true));
+
         try {
             return Http::withHeaders(['x-goog-api-key' => $this->key()])
                 ->connectTimeout(10)
-                ->timeout((int) config('services.gemini.timeout', 30))
+                ->timeout(max(5, min((int) config('services.gemini.timeout', 25), $remaining)))
                 ->retry(2, 1000, fn ($e) => $e instanceof RequestException && in_array($e->response->status(), [429, 500, 503], true), throw: false)
                 ->post(self::BASE.$model.':generateContent', $body);
         } catch (ConnectionException $e) {
-            Log::warning('Gemini connection failed', ['error' => $e->getMessage()]);
-            throw new AiException('The server could not reach Google Gemini ('.Str::limit($e->getMessage(), 140).'). Your host may block outgoing connections — ask Hostinger support to allow generativelanguage.googleapis.com.', 422, $e);
+            Log::warning('Gemini connection failed', ['model' => $model, 'error' => $e->getMessage()]);
+            // cURL 28 after connecting ("… with N bytes received") = slow answer, not a blocked connection.
+            if (preg_match('/cURL error 28/i', $e->getMessage()) && str_contains($e->getMessage(), 'bytes received')) {
+                return null;
+            }
+            throw new AiException('The server could not connect to Google Gemini ('.Str::limit($e->getMessage(), 140).'). If this keeps happening, ask Hostinger support to allow outgoing HTTPS to generativelanguage.googleapis.com.', 422, $e);
         }
     }
 

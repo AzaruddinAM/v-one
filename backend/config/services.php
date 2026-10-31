@@ -32,7 +32,9 @@ return [
     'gemini' => [
         'key' => env('GEMINI_API_KEY', ''),
         'model' => env('GEMINI_MODEL', 'gemini-3.5-flash'),
-        'timeout' => env('GEMINI_TIMEOUT', 30),
+        'timeout' => env('GEMINI_TIMEOUT', 25),
+        // Total seconds one API request may spend waiting for Gemini (stay under the host's proxy timeout).
+        'deadline' => env('GEMINI_DEADLINE', 55),
         'per_minute' => env('AI_REQUESTS_PER_MINUTE', 15),
         'per_day' => env('AI_REQUESTS_PER_DAY', 500),
     ],
