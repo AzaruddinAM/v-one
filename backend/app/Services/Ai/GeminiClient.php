@@ -118,7 +118,16 @@ class GeminiClient
             throw new AiException("The AI could not answer this request ($reason).", 422);
         }
 
-        return $candidate['content'];
+        // PHP decodes an empty JSON object ({}) to [], which would be sent back as a list — Gemini rejects that.
+        $content = $candidate['content'];
+        foreach ($content['parts'] as &$part) {
+            if (isset($part['functionCall']) && empty($part['functionCall']['args'])) {
+                $part['functionCall']['args'] = new \stdClass;
+            }
+        }
+        unset($part);
+
+        return $content;
     }
 
     private function send(string $model, array $contents, array $options, bool $thinking): Response

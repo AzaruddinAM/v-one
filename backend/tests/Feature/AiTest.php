@@ -224,6 +224,20 @@ class AiTest extends TestCase
     }
 
     #[Test]
+    public function function_calls_without_arguments_are_sent_back_as_an_object(): void
+    {
+        $this->geminiReturns(
+            [['functionCall' => ['name' => 'business_summary', 'args' => new \stdClass]]],
+            [['text' => 'All good.']],
+        );
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => '/summary']]])
+            ->assertOk()->assertJsonPath('reply', 'All good.')->assertJsonPath('tools', ['business_summary']);
+
+        Http::assertSent(fn ($r) => str_contains($r->body(), '"functionCall":{"name":"business_summary","args":{}}'));
+    }
+
+    #[Test]
     public function an_overloaded_model_falls_back_to_the_next_one(): void
     {
         config(['services.gemini.model' => 'gemini-3.5-flash']);
