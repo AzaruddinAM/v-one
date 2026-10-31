@@ -1,0 +1,31 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Organization;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
+
+/** @extends Factory<\App\Models\User> */
+class UserFactory extends Factory
+{
+    protected static ?string $password;
+
+    public function definition(): array
+    {
+        return [
+            'organization_id' => Organization::factory(),
+            'name' => fake()->name(),
+            'phone' => '9'.fake()->unique()->numerify('#########'),
+            'email' => fake()->safeEmail(),
+            'password' => static::$password ??= Hash::make('Secret123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ];
+    }
+
+    public function role(string $role): static
+    {
+        return $this->state(fn () => ['role' => $role]);
+    }
+}

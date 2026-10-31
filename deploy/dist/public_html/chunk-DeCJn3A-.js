@@ -1,0 +1,1 @@
+function r(t=new Date){let e=n=>String(n).padStart(2,`0`);return`${t.getFullYear()}-${e(t.getMonth()+1)}-${e(t.getDate())}`}function a(t,e){let n=typeof t==`string`?new Date(t+`T00:00:00`):new Date(t);return n.setDate(n.getDate()+e),r(n)}function g(t=4,e=new Date){let n=e.getMonth()+1>=t?e.getFullYear():e.getFullYear()-1;return r(new Date(n,t-1,1))}export{g as n,r,a as t};

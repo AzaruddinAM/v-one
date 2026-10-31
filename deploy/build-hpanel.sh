@@ -17,9 +17,13 @@ TPL="$ROOT/deploy/templates"
 
 rm -rf "$OUT" && mkdir -p "$OUT/public_html/backend/core" "$OUT/database"
 
-echo "▶ Building Angular (production)…"
-(cd "$ROOT/frontend" && npm ci --no-audit --no-fund && npx ng build --configuration production)
-cp -r "$ROOT/frontend/dist/v-one/browser/." "$OUT/public_html/"
+# Set FRONTEND_DIST=/path/to/dist/v-one/browser to reuse an existing production build.
+if [ -z "${FRONTEND_DIST:-}" ]; then
+  echo "▶ Building Angular (production)…"
+  (cd "$ROOT/frontend" && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npx ng build --configuration production)
+  FRONTEND_DIST="$ROOT/frontend/dist/v-one/browser"
+fi
+cp -r "$FRONTEND_DIST/." "$OUT/public_html/"
 cp "$TPL/frontend.htaccess" "$OUT/public_html/.htaccess"
 
 echo "▶ Packaging Laravel…"
@@ -27,6 +31,7 @@ CORE="$OUT/public_html/backend/core"
 (cd "$ROOT/backend" && tar --exclude=./vendor --exclude=./node_modules --exclude=./.env --exclude='./storage/logs/*.log' \
   --exclude='./storage/framework/sessions/*' --exclude='./storage/framework/views/*.php' --exclude='./storage/framework/cache/data/*' \
   --exclude=./database/database.sqlite --exclude=./tests --exclude=./.phpunit.result.cache -cf - .) | (cd "$CORE" && tar xf -)
+mkdir -p "$CORE/storage/framework/"{sessions,views,cache/data} "$CORE/storage/logs" "$CORE/storage/app/public" "$CORE/bootstrap/cache"
 (cd "$CORE" && composer install --no-dev --optimize-autoloader --no-interaction --no-progress)
 rm -f "$CORE/bootstrap/cache/config.php" "$CORE/bootstrap/cache/routes-v7.php"
 cp "$TPL/backend-index.php" "$OUT/public_html/backend/index.php"
