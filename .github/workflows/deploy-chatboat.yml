@@ -112,6 +112,6 @@ jobs:
           sleep 5
           curl -fsS https://velouraone.in/backend/api/health
           curl -fsS -o /dev/null -w "chatboat %{http_code}\n" https://velouraone.in/chatboat/
-          code=$(curl -s -o /dev/null -w "%{http_code}" https://velouraone.in/backend/api/ai/status)
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H "Accept: application/json" https://velouraone.in/backend/api/ai/status)
           echo "ai/status → $code (401 = route exists, needs login)"
           [ "$code" = "401" ]
