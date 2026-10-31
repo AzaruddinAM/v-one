@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -17,8 +18,13 @@ class GeminiClient
 {
     private const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
-    /** Tried in order when the configured model is unavailable for the key. */
-    private const FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+    public const DEFAULT_MODEL = 'gemini-3.5-flash';
+
+    /**
+     * Tried in order when the configured model is unavailable for the key (Google retires
+     * older models for new keys). The "-latest" aliases always point at a current model.
+     */
+    private const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash'];
 
     private ?string $workingModel = null;
 
@@ -34,7 +40,13 @@ class GeminiClient
 
     private function configuredModel(): string
     {
-        return trim((string) config('services.gemini.model', 'gemini-2.5-flash'), " \t\r\n\"'") ?: 'gemini-2.5-flash';
+        return trim((string) config('services.gemini.model', self::DEFAULT_MODEL), " \t\r\n\"'") ?: self::DEFAULT_MODEL;
+    }
+
+    /** The model that last worked for this key is remembered, so later requests skip retired ones. */
+    private function cacheKey(): string
+    {
+        return 'gemini.working-model.'.md5($this->key().'|'.$this->configuredModel());
     }
 
     /** Tolerates keys pasted into .env with quotes, spaces or Windows line endings. */
@@ -54,12 +66,21 @@ class GeminiClient
             throw new AiException('AI assistant is not configured. Add GEMINI_API_KEY to the backend .env file.', 422);
         }
 
-        $models = $this->workingModel ? [$this->workingModel] : array_values(array_unique([$this->configuredModel(), ...self::FALLBACK_MODELS]));
+        $this->workingModel ??= Cache::get($this->cacheKey());
+        $models = array_values(array_unique(array_filter([$this->workingModel, $this->configuredModel(), ...self::FALLBACK_MODELS])));
+        $tried = [];
 
         foreach ($models as $i => $model) {
-            $response = $this->send($model, $contents, $options);
+            $tried[] = $model;
+            $response = $this->send($model, $contents, $options, thinking: true);
+            if ($response->status() === 400 && preg_match('/thinking/i', (string) $response->json('error.message'))) {
+                $response = $this->send($model, $contents, $options, thinking: false);
+            }
             if ($response->successful()) {
-                $this->workingModel = $model;
+                if ($this->workingModel !== $model) {
+                    $this->workingModel = $model;
+                    Cache::put($this->cacheKey(), $model, now()->addDay());
+                }
                 break;
             }
             $status = $response->status();
@@ -68,17 +89,22 @@ class GeminiClient
             Log::warning('Gemini request failed', ['model' => $model, 'status' => $status, 'body' => $detail]);
 
             $modelProblem = in_array($status, [403, 404], true)
-                || ($status === 400 && preg_match('/model|not supported|thinking/i', $detail) && ! str_contains($detail, 'API key'));
-            if ($modelProblem && $i < count($models) - 1) {
-                continue; // try the next model
+                || ($status === 400 && preg_match('/model|not supported|no longer available/i', $detail) && ! str_contains($detail, 'API key'));
+            if ($modelProblem) {
+                if ($model === $this->workingModel) {
+                    $this->workingModel = null;
+                    Cache::forget($this->cacheKey());
+                }
+                if ($i < count($models) - 1) {
+                    continue; // try the next model
+                }
             }
 
             // Upstream failures are answered with 422 / 429 — hosting proxies replace 502/503 bodies with their own error page.
             throw new AiException(match (true) {
                 $status === 429 => 'The AI service is busy (rate limit or free quota reached). Please wait a minute and try again.',
                 str_contains($detail, 'API key') => "The Gemini API key is not valid. Copy it again from aistudio.google.com/apikey into GEMINI_API_KEY ($detail).",
-                $status === 403 => "This Gemini API key is not allowed to use the model ($detail).",
-                $status === 404 => "Gemini model \"$model\" was not found. Set GEMINI_MODEL in .env ($detail).",
+                $modelProblem => 'None of these Gemini models is available for this API key: '.implode(', ', $tried).". Set GEMINI_MODEL in .env to a current model from ai.google.dev/gemini-api/docs/models ($detail).",
                 default => "The AI service returned an error ($status: $detail).",
             }, $status === 429 ? 429 : 422);
         }
@@ -92,12 +118,14 @@ class GeminiClient
         return $candidate['content'];
     }
 
-    private function send(string $model, array $contents, array $options): Response
+    private function send(string $model, array $contents, array $options, bool $thinking): Response
     {
         $config = $options['generationConfig'] ?? [];
-        // 2.5 models "think" before answering by default, which makes replies slow enough for shared hosting to time out.
-        if (str_starts_with($model, 'gemini-2.5')) {
+        // Newer models "think" before answering by default, which makes replies slow enough for shared hosting to time out.
+        if ($thinking && str_starts_with($model, 'gemini-2.5')) {
             $config['thinkingConfig'] = ['thinkingBudget' => $options['thinkingBudget'] ?? 0];
+        } elseif ($thinking && preg_match('/^gemini-[3-9]/', $model)) {
+            $config['thinkingConfig'] = ['thinkingLevel' => ($options['thinkingBudget'] ?? 0) > 0 ? 'medium' : 'low'];
         }
 
         $body = array_filter([

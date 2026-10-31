@@ -14,7 +14,7 @@ v-one ships with two Google Gemini features:
 
    ```env
    GEMINI_API_KEY=your-key-here
-   GEMINI_MODEL=gemini-2.5-flash      # optional, any Gemini model that supports images + function calling
+   GEMINI_MODEL=gemini-3.5-flash      # optional; if it is unavailable for your key, current models are tried automatically
    AI_REQUESTS_PER_MINUTE=15          # optional, per user
    AI_REQUESTS_PER_DAY=500            # optional, per organization
    ```

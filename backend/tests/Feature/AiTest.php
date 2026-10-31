@@ -190,18 +190,47 @@ class AiTest extends TestCase
     }
 
     #[Test]
-    public function unavailable_model_falls_back_to_the_next_one_and_thinking_is_disabled(): void
+    public function retired_models_fall_back_to_a_current_one_which_is_remembered(): void
     {
-        config(['services.gemini.model' => 'gemini-9-ultra']);
+        config(['services.gemini.model' => 'gemini-2.5-flash-lite']);
+        $retired = fn (string $m) => Http::response(['error' => ['message' => "This model models/$m is no longer available to new users."]], 404);
         Http::fake([
-            '*gemini-9-ultra:generateContent' => Http::response(['error' => ['message' => 'models/gemini-9-ultra is not found']], 404),
-            '*gemini-2.5-flash:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+            '*gemini-2.5-flash-lite:generateContent' => $retired('gemini-2.5-flash-lite'),
+            '*gemini-flash-latest:generateContent' => $retired('gemini-flash-latest'),
+            '*gemini-3.5-flash:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
         ]);
 
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
             ->assertOk()->assertJsonPath('reply', 'Hello!');
+        Http::assertSentCount(3);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'gemini-3.5-flash:')
+            && $r['generationConfig']['thinkingConfig']['thinkingLevel'] === 'low');
 
-        Http::assertSent(fn ($r) => str_contains($r->url(), 'gemini-2.5-flash')
-            && $r['generationConfig']['thinkingConfig']['thinkingBudget'] === 0);
+        // The next question goes straight to the model that worked.
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi again']]])->assertOk();
+        Http::assertSentCount(4);
+    }
+
+    #[Test]
+    public function thinking_settings_are_dropped_when_a_model_rejects_them(): void
+    {
+        Http::fake(['*' => Http::sequence()
+            ->push(['error' => ['message' => 'thinking_level is not supported for this model.']], 400)
+            ->push(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hi!']]]]]])]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertOk()->assertJsonPath('reply', 'Hi!');
+        Http::assertSent(fn ($r) => ! isset($r['generationConfig']['thinkingConfig']));
+    }
+
+    #[Test]
+    public function all_models_unavailable_lists_what_was_tried(): void
+    {
+        config(['services.gemini.model' => 'gemini-3.5-flash']);
+        Http::fake(['*' => Http::response(['error' => ['message' => 'models/x is not found']], 404)]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'gemini-3.5-flash, gemini-flash-latest'));
     }
 }
