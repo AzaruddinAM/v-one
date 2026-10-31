@@ -100,7 +100,7 @@ class AiTest extends TestCase
         $res = $this->postJson('/api/ai/import-bill', [
             'target' => 'bill',
             'reference' => 'ST/2026/88',
-            'date' => '2026-10-20',
+            'date' => today()->toDateString(),
             'status' => 'open',
             'vendor' => ['name' => 'Sharma Traders', 'gstin' => '27AAAPL1234C1ZV'],
             'items' => [
@@ -128,7 +128,7 @@ class AiTest extends TestCase
 
         $this->postJson('/api/ai/import-bill', [
             'target' => 'expense',
-            'date' => '2026-10-21',
+            'date' => today()->toDateString(),
             'reference' => 'EB-4411',
             'expense' => ['account_id' => $account->id, 'amount' => 1000, 'tax_id' => $this->tax(18)->id, 'description' => 'Electricity'],
         ])->assertCreated()->assertJsonPath('type', 'expense')->assertJsonPath('record.total', 1180);
