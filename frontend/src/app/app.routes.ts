@@ -46,6 +46,7 @@ export const routes: Routes = [
       ...docRoutes('sales/invoices', 'invoice'),
       ...docRoutes('sales/credit-notes', 'credit_note'),
       ...docRoutes('purchases/orders', 'purchase_order'),
+      { path: 'purchases/scan-bill', title: 'Scan bill · v-one', loadComponent: () => import('./features/ai/bill-scan').then((m) => m.BillScan) },
       ...docRoutes('purchases/bills', 'bill'),
       { path: 'payments/received', data: { direction: 'in' }, loadComponent: () => import('./features/payments/payment-list').then((m) => m.PaymentList) },
       { path: 'payments/made', data: { direction: 'out' }, loadComponent: () => import('./features/payments/payment-list').then((m) => m.PaymentList) },

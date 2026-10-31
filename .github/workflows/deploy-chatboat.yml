@@ -1,0 +1,106 @@
+# Deploys the AI edition of v-one to https://velouraone.in/chatboat over FTP.
+#
+#   frontend → <FTP_REMOTE_DIR>/chatboat/        (Angular, base href /chatboat/)
+#   backend  → <FTP_REMOTE_DIR>/backend/core/    (app/, config/, routes/ only — .env, vendor/, storage/ are never touched)
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   FTP_HOST        e.g. ftp.velouraone.in  (hPanel → Files → FTP Accounts)
+#   FTP_USER        FTP username
+#   FTP_PASSWORD    FTP password
+# Optional:
+#   FTP_REMOTE_DIR  folder that holds the site, relative to the FTP login folder (default: public_html)
+name: Deploy /chatboat
+
+on:
+  push:
+    branches: [feature/gemini-ai-assistant]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-chatboat
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, bcmath
+      - name: Backend tests
+        working-directory: backend
+        run: |
+          composer install --no-interaction --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend tests
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build Angular for /chatboat/
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx ng build --configuration production --base-href /chatboat/ --output-path dist/chatboat
+          cp ../deploy/templates/chatboat.htaccess dist/chatboat/browser/.htaccess
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload over FTP
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          REMOTE: ${{ secrets.FTP_REMOTE_DIR || 'public_html' }}
+        run: |
+          if [ -z "$FTP_HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ]; then
+            echo "::error::Add the FTP_HOST, FTP_USER and FTP_PASSWORD repository secrets first."; exit 1
+          fi
+          lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" <<EOF
+          set cmd:fail-exit yes
+          set ftp:ssl-allow true
+          set ssl:verify-certificate no
+          set net:max-retries 3
+          set net:timeout 30
+          cd "$REMOTE" || exit 1
+          ls backend/core/artisan || exit 1
+          mkdir -p chatboat
+          mirror -R --delete --parallel=4 --verbose frontend/dist/chatboat/browser chatboat
+          mirror -R --parallel=4 --verbose backend/app backend/core/app
+          mirror -R --parallel=4 --verbose backend/config backend/core/config
+          mirror -R --parallel=4 --verbose backend/routes backend/core/routes
+          rm -f backend/core/bootstrap/cache/config.php
+          rm -f backend/core/bootstrap/cache/routes-v7.php
+          bye
+          EOF
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -fsS https://velouraone.in/backend/api/health
+          curl -fsS -o /dev/null -w "chatboat %{http_code}\n" https://velouraone.in/chatboat/
+          code=$(curl -s -o /dev/null -w "%{http_code}" https://velouraone.in/backend/api/ai/status)
+          echo "ai/status → $code (401 = route exists, needs login)"
+          [ "$code" = "401" ]

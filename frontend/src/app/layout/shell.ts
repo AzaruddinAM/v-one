@@ -4,6 +4,7 @@ import { filter } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthStore } from '../core/auth/auth.store';
 import { LookupsStore } from '../core/state/lookups.store';
+import { ChatWidget } from '../features/ai/chat-widget';
 import { Icon } from '../shared/icon';
 
 interface NavItem {
@@ -18,7 +19,7 @@ interface NavGroup {
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Icon, ChatWidget],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './shell.scss',
   template: `
@@ -59,6 +60,7 @@ interface NavGroup {
         </div>
         <div class="spacer"></div>
         <div class="quick">
+          <a routerLink="/purchases/scan-bill" class="btn btn--outline btn--sm" title="Scan a bill with AI"><app-icon name="sparkles" [size]="16" /> <span class="hide-sm">Scan Bill</span></a>
           <a routerLink="/sales/invoices/new" class="btn btn--sm"><app-icon name="plus" [size]="16" /> <span class="hide-sm">New Invoice</span></a>
         </div>
         <div class="user" (click)="userMenu.set(!userMenu())">
@@ -81,6 +83,7 @@ interface NavGroup {
         <router-outlet />
       </main>
     </div>
+    <app-chat-widget />
   `,
   host: { '(document:click)': 'onDocClick($event)' },
 })
@@ -115,6 +118,7 @@ export class Shell {
       items: [
         { label: 'Purchase Orders', icon: 'cart', link: '/purchases/orders' },
         { label: 'Bills', icon: 'receipt', link: '/purchases/bills' },
+        { label: 'Scan Bill (AI)', icon: 'sparkles', link: '/purchases/scan-bill' },
         { label: 'Payments Made', icon: 'card', link: '/payments/made' },
         { label: 'Expenses', icon: 'wallet', link: '/expenses' },
       ],

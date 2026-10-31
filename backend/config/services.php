@@ -28,6 +28,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Google Gemini — powers the AI bill scanner and the chat assistant.
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY', ''),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'timeout' => env('GEMINI_TIMEOUT', 60),
+        'per_minute' => env('AI_REQUESTS_PER_MINUTE', 15),
+        'per_day' => env('AI_REQUESTS_PER_DAY', 500),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

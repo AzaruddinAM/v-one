@@ -30,6 +30,7 @@ v-one/
 | **Accountant** | Chart of accounts (25 standard accounts pre-created), manual journals with debit = credit validation |
 | **Reports** | Profit & Loss, Balance Sheet, Receivables & Payables aging, Sales by Customer, Sales by Item, GST/Tax summary, Inventory valuation — date presets, CSV export, print |
 | **Settings** | Organization profile, currency, financial year, default terms; tax rates; users & roles (admin / accountant / staff); profile & password |
+| **AI (Gemini)** | Scan a bill photo/PDF → review & edit the extracted vendor, items, GST and totals → confirm to save as a bill or expense; ✨ chat assistant that answers from your live data, drafts reminders and supports `/commands`. See [AI-ASSISTANT-GUIDE.md](AI-ASSISTANT-GUIDE.md) |
 | **Multi-tenant** | Every organization's data is isolated automatically (global scope + scoped validation) |
 
 ### Demo login (demo SQL / seeder)
@@ -72,6 +73,7 @@ DB_DATABASE=u123456789_vone
 DB_USERNAME=u123456789_vone
 DB_PASSWORD=your-db-password
 CORS_ALLOWED_ORIGINS=https://yourdomain.com
+GEMINI_API_KEY=your-gemini-key     # optional: enables bill scanning + AI chat
 ```
 A unique `APP_KEY` is already filled in.
 
@@ -114,8 +116,8 @@ npm start                       # http://localhost:4200  (talks to http://localh
 ## Tests
 
 ```bash
-cd backend  && php artisan test     # 37 tests: auth, tenancy, roles, documents, stock, payments, reports, calculator
-cd frontend && npm test             # 34 tests: auth store, guards, interceptor, list store, totals, pipes, login form
+cd backend  && php artisan test     # 45 tests: auth, tenancy, roles, documents, stock, payments, reports, calculator, AI
+cd frontend && npm test             # 43 tests: auth store, guards, interceptor, list store, totals, pipes, login form, chat commands
 ```
 
 ---

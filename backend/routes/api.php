@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\AiController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DocumentController;
@@ -61,6 +62,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('payments', PaymentController::class)->except('update')->middlewareFor('destroy', $canDelete);
     Route::apiResource('expenses', ExpenseController::class)->middlewareFor('destroy', $canDelete);
     Route::apiResource('journals', JournalController::class)->middleware($canDelete);
+
+    Route::prefix('ai')->controller(AiController::class)->group(function () {
+        Route::get('status', 'status');
+        Route::post('scan-bill', 'scanBill')->middleware('throttle:ai');
+        Route::post('import-bill', 'importBill');
+        Route::post('chat', 'chat')->middleware('throttle:ai');
+    });
 
     Route::prefix('reports')->controller(ReportController::class)->group(function () {
         Route::get('dashboard', 'dashboard');
