@@ -69,6 +69,7 @@ class GeminiClient
         $this->workingModel ??= Cache::get($this->cacheKey());
         $models = array_values(array_unique(array_filter([$this->workingModel, $this->configuredModel(), ...self::FALLBACK_MODELS])));
         $tried = [];
+        $sawBusy = false;
 
         foreach ($models as $i => $model) {
             $tried[] = $model;
@@ -90,19 +91,21 @@ class GeminiClient
 
             $modelProblem = in_array($status, [403, 404], true)
                 || ($status === 400 && preg_match('/model|not supported|no longer available/i', $detail) && ! str_contains($detail, 'API key'));
-            if ($modelProblem) {
-                if ($model === $this->workingModel) {
-                    $this->workingModel = null;
-                    Cache::forget($this->cacheKey());
-                }
-                if ($i < count($models) - 1) {
-                    continue; // try the next model
-                }
+            if ($modelProblem && $model === $this->workingModel) {
+                $this->workingModel = null;
+                Cache::forget($this->cacheKey());
+            }
+            // Overload and quota limits are per model, so another model often still answers.
+            $busy = in_array($status, [429, 500, 503], true) || preg_match('/high demand|overloaded|unavailable/i', $detail);
+            $sawBusy = $sawBusy || $busy;
+            if (($modelProblem || $busy) && $i < count($models) - 1) {
+                continue; // try the next model
             }
 
             // Upstream failures are answered with 422 / 429 — hosting proxies replace 502/503 bodies with their own error page.
             throw new AiException(match (true) {
-                $status === 429 => 'The AI service is busy (rate limit or free quota reached). Please wait a minute and try again.',
+                $sawBusy && $status !== 429 => "Google's Gemini servers are very busy right now (tried ".implode(', ', $tried).'). Please try again in a minute.',
+                $status === 429 => 'The AI free quota or rate limit is used up for now (tried '.implode(', ', $tried).'). Please wait a minute and try again.',
                 str_contains($detail, 'API key') => "The Gemini API key is not valid. Copy it again from aistudio.google.com/apikey into GEMINI_API_KEY ($detail).",
                 $modelProblem => 'None of these Gemini models is available for this API key: '.implode(', ', $tried).". Set GEMINI_MODEL in .env to a current model from ai.google.dev/gemini-api/docs/models ($detail).",
                 default => "The AI service returned an error ($status: $detail).",

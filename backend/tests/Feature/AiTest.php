@@ -224,6 +224,19 @@ class AiTest extends TestCase
     }
 
     #[Test]
+    public function an_overloaded_model_falls_back_to_the_next_one(): void
+    {
+        config(['services.gemini.model' => 'gemini-3.5-flash']);
+        Http::fake([
+            '*gemini-3.5-flash:generateContent' => Http::response(['error' => ['message' => 'This model is currently experiencing high demand.']], 503),
+            '*gemini-flash-latest:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+        ]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertOk()->assertJsonPath('reply', 'Hello!');
+    }
+
+    #[Test]
     public function all_models_unavailable_lists_what_was_tried(): void
     {
         config(['services.gemini.model' => 'gemini-3.5-flash']);
