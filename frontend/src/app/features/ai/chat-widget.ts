@@ -246,6 +246,8 @@ export class ChatWidget {
       },
       error: (e) => {
         this.busy.set(false);
+        // Keep the unanswered question on screen but out of the history sent next time.
+        this.messages.update((list) => list.map((m, i) => (i === list.length - 1 && m.role === 'user' ? { ...m, local: true } : m)));
         this.push({ role: 'model', text: '⚠️ ' + errorMessage(e, 'The assistant is unavailable right now.'), error: true });
       },
     });

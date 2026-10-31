@@ -6,6 +6,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Minimal Google Gemini REST client (generateContent).
@@ -51,17 +52,21 @@ class GeminiClient
                     || ($e instanceof RequestException && in_array($e->response->status(), [429, 500, 503], true)), throw: false)
                 ->post(self::BASE.$this->model().':generateContent', $body);
         } catch (ConnectionException $e) {
-            throw new AiException('Could not reach the AI service. Please try again.', 502, $e);
+            Log::warning('Gemini connection failed', ['error' => $e->getMessage()]);
+            throw new AiException('Could not reach the AI service from the server ('.Str::limit($e->getMessage(), 120).').', 502, $e);
         }
 
         if ($response->failed()) {
-            Log::warning('Gemini request failed', ['status' => $response->status(), 'body' => $response->json('error.message')]);
             $status = $response->status();
+            // Google's error text (e.g. "API key not valid", "models/x is not found") never contains the key itself.
+            $detail = Str::limit((string) ($response->json('error.message') ?? $response->body()), 200);
+            Log::warning('Gemini request failed', ['status' => $status, 'body' => $detail]);
             throw new AiException(match (true) {
-                $status === 429 => 'The AI service is busy (rate limit reached). Please wait a moment and try again.',
-                $status === 400 && str_contains((string) $response->json('error.message'), 'API key') => 'The Gemini API key is invalid.',
-                $status === 403 => 'The Gemini API key is not allowed to use this model.',
-                default => 'The AI service returned an error. Please try again.',
+                $status === 429 => 'The AI service is busy (rate limit or quota reached). Please wait a moment and try again.',
+                str_contains($detail, 'API key') => "The Gemini API key is invalid or missing ($detail).",
+                $status === 403 => "The Gemini API key is not allowed to use this model ($detail).",
+                $status === 404 => "Gemini model \"{$this->model()}\" was not found. Set GEMINI_MODEL in .env ($detail).",
+                default => "The AI service returned an error ($status: $detail).",
             }, $status === 429 ? 429 : 502);
         }
 
