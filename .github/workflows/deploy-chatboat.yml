@@ -8,7 +8,8 @@
 #   FTP_USER        FTP username
 #   FTP_PASSWORD    FTP password
 # Optional:
-#   FTP_REMOTE_DIR  folder that holds the site, relative to the FTP login folder (default: public_html)
+#   FTP_REMOTE_DIR  folder that holds the site, relative to the FTP login folder
+#                   (default: auto-detected — ".", "public_html" or "domains/velouraone.in/public_html")
 name: Deploy /chatboat
 
 on:
@@ -73,24 +74,34 @@ jobs:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          REMOTE: ${{ secrets.FTP_REMOTE_DIR || 'public_html' }}
+          REMOTE: ${{ secrets.FTP_REMOTE_DIR }}
         run: |
           if [ -z "$FTP_HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ]; then
             echo "::error::Add the FTP_HOST, FTP_USER and FTP_PASSWORD repository secrets first."; exit 1
           fi
+          OPTS="set ftp:ssl-allow true; set ssl:verify-certificate no; set net:max-retries 3; set net:timeout 30"
+          # Find the site folder: the FTP login may open in public_html itself or one level above it.
+          if [ -z "$REMOTE" ]; then
+            for dir in . public_html domains/velouraone.in/public_html; do
+              if lftp -u "$FTP_USER","$FTP_PASSWORD" -e "$OPTS; cls -1 $dir/backend/core/artisan; bye" "$FTP_HOST" >/dev/null 2>&1; then
+                REMOTE=$dir; break
+              fi
+            done
+          fi
+          if [ -z "$REMOTE" ]; then
+            echo "::error::Could not find backend/core/artisan over FTP. Set the FTP_REMOTE_DIR secret to the folder that contains backend/ and index.html."; exit 1
+          fi
+          echo "Deploying into FTP folder: $REMOTE"
           lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" <<EOF
+          $OPTS
           set cmd:fail-exit yes
-          set ftp:ssl-allow true
-          set ssl:verify-certificate no
-          set net:max-retries 3
-          set net:timeout 30
-          cd "$REMOTE" || exit 1
-          ls backend/core/artisan || exit 1
+          cd "$REMOTE"
           mkdir -p chatboat
           mirror -R --delete --parallel=4 --verbose frontend/dist/chatboat/browser chatboat
           mirror -R --parallel=4 --verbose backend/app backend/core/app
           mirror -R --parallel=4 --verbose backend/config backend/core/config
           mirror -R --parallel=4 --verbose backend/routes backend/core/routes
+          set cmd:fail-exit no
           rm -f backend/core/bootstrap/cache/config.php
           rm -f backend/core/bootstrap/cache/routes-v7.php
           bye
