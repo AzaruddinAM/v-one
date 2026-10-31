@@ -94,9 +94,10 @@ jobs:
           echo "Deploying into FTP folder: $REMOTE"
           lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" <<EOF
           $OPTS
-          set cmd:fail-exit yes
           cd "$REMOTE"
+          # Some FTP servers reject "mkdir -p" on an existing folder — harmless, so it runs before fail-exit.
           mkdir -p chatboat
+          set cmd:fail-exit yes
           mirror -R --delete --parallel=4 --verbose frontend/dist/chatboat/browser chatboat
           mirror -R --parallel=4 --verbose backend/app backend/core/app
           mirror -R --parallel=4 --verbose backend/config backend/core/config
