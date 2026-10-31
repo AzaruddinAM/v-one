@@ -89,7 +89,7 @@ class AiTest extends TestCase
 
         config(['services.gemini.key' => '']);
         $this->post('/api/ai/scan-bill', ['file' => UploadedFile::fake()->image('bill.png')], ['Accept' => 'application/json'])
-            ->assertStatus(503);
+            ->assertStatus(422);
     }
 
     #[Test]
@@ -173,5 +173,35 @@ class AiTest extends TestCase
 
         Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'quota']], 429)]);
         $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])->assertStatus(429);
+    }
+
+    #[Test]
+    public function invalid_key_is_reported_with_googles_reason_as_422(): void
+    {
+        config(['services.gemini.key' => '"bad-key"']);
+        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'API key not valid. Please pass a valid API key.']], 400)]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'API key not valid'));
+
+        // Quotes pasted around the key in .env are stripped.
+        Http::assertSent(fn ($r) => $r->hasHeader('x-goog-api-key', 'bad-key'));
+    }
+
+    #[Test]
+    public function unavailable_model_falls_back_to_the_next_one_and_thinking_is_disabled(): void
+    {
+        config(['services.gemini.model' => 'gemini-9-ultra']);
+        Http::fake([
+            '*gemini-9-ultra:generateContent' => Http::response(['error' => ['message' => 'models/gemini-9-ultra is not found']], 404),
+            '*gemini-2.5-flash:generateContent' => Http::response(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Hello!']]]]]]),
+        ]);
+
+        $this->postJson('/api/ai/chat', ['messages' => [['role' => 'user', 'text' => 'hi']]])
+            ->assertOk()->assertJsonPath('reply', 'Hello!');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'gemini-2.5-flash')
+            && $r['generationConfig']['thinkingConfig']['thinkingBudget'] === 0);
     }
 }
