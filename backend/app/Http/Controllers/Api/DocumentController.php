@@ -60,7 +60,23 @@ class DocumentController extends Controller
             $q->where(fn ($w) => $w->where('number', 'like', "%$term%")->orWhere('reference', 'like', "%$term%")
                 ->orWhereHas('contact', fn ($c) => $c->where('name', 'like', "%$term%")));
         }
-        $this->sort($q, $request, ['date', 'number', 'total', 'balance', 'due_date', 'id'], '-date');
+        $this->columnFilters($q, $request, [
+            'number' => ['number', 'like'],
+            'reference' => ['reference', 'like'],
+            'contact' => static::whereRelated('contact', ['name', 'company_name']),
+            'status' => ['status', 'eq'],
+            'date_from' => ['date', 'from'],
+            'date_to' => ['date', 'to'],
+            'due_from' => ['due_date', 'from'],
+            'due_to' => ['due_date', 'to'],
+            'total_min' => ['total', 'min'],
+            'total_max' => ['total', 'max'],
+            'balance_min' => ['balance', 'min'],
+            'balance_max' => ['balance', 'max'],
+        ]);
+        $this->sort($q, $request, ['date', 'number', 'total', 'balance', 'due_date', 'status', 'id'], '-date', [
+            'contact' => static::orderByRelated('contacts', 'contact_id', 'name'),
+        ]);
         $q->orderByDesc('documents.id');
 
         return $this->paginate($q, $request);

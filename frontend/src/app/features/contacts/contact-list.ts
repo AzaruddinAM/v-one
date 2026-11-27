@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit } from '@angular/core';
+import { injectPreferences } from '../../core/preferences';
+import { ColFilter, filterRowOpen, SortHeader } from '../../shared/table-filters';
 import { RouterLink } from '@angular/router';
 import { signalStore } from '@ngrx/signals';
 import { AuthStore } from '../../core/auth/auth.store';
@@ -16,7 +18,7 @@ export const ContactListStore = signalStore(withPaginatedList<Contact>('contacts
 
 @Component({
   selector: 'app-contact-list',
-  imports: [RouterLink, Icon, MoneyPipe, PageHeader, Pagination, EmptyState],
+  imports: [RouterLink, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, SortHeader, ColFilter],
   providers: [ContactListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -35,11 +37,14 @@ export const ContactListStore = signalStore(withPaginatedList<Contact>('contacts
           <option value="1">Active</option>
           <option value="0">Inactive</option>
         </select>
+        @if (prefs().table_filters) {
+          <button type="button" class="btn btn--outline btn--sm" [attr.aria-pressed]="filtersOpen()" (click)="toggleFilters()"><app-icon name="filter" [size]="16" /> {{ filtersOpen() ? 'Hide filters' : 'Filters' }}</button>
+        }
       </div>
       @if (store.loading()) {
         <div class="loading-bar"></div>
       }
-      @if (store.isEmpty()) {
+      @if (store.isEmpty() && !store.isFiltering()) {
         <app-empty-state [icon]="contactType() === 'customer' ? 'users' : 'truck'" [title]="'No ' + plural().toLowerCase() + ' found'" message="Add your first one to start billing.">
           <a [routerLink]="['/' + base(), 'new']" class="btn"><app-icon name="plus" /> Add {{ singular() }}</a>
         </app-empty-state>
@@ -48,12 +53,21 @@ export const ContactListStore = signalStore(withPaginatedList<Contact>('contacts
           <table class="table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th appSort="name" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Name</th>
                 <th>Contact</th>
-                <th>City</th>
-                <th class="text-right">{{ contactType() === 'customer' ? 'Receivable' : 'Payable' }}</th>
+                <th appSort="city" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">City</th>
+                <th appSort="outstanding" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">{{ contactType() === 'customer' ? 'Receivable' : 'Payable' }}</th>
                 <th></th>
               </tr>
+              @if (showFilterRow()) {
+                <tr class="filter-row">
+                  <th><app-col-filter key="name" label="Name or company" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="contact" label="Phone or email" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="city" label="City" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th></th>
+                  <th></th>
+                </tr>
+              }
             </thead>
             <tbody>
               @for (c of store.entities(); track c.id) {
@@ -78,6 +92,8 @@ export const ContactListStore = signalStore(withPaginatedList<Contact>('contacts
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td class="no-match" colspan="5">No {{ plural().toLowerCase() }} match these filters.</td></tr>
               }
             </tbody>
           </table>
@@ -98,8 +114,17 @@ export class ContactList implements OnInit {
   protected readonly plural = computed(() => this.singular() + 's');
   protected readonly base = computed(() => (this.contactType() === 'customer' ? 'customers' : 'vendors'));
 
+  protected readonly prefs = injectPreferences();
+  protected readonly filtersOpen = filterRowOpen('contacts');
+  protected readonly showFilterRow = computed(() => this.prefs().table_filters && this.filtersOpen());
+
   ngOnInit(): void {
     this.store.setFilters({ type: this.contactType() });
+  }
+
+  toggleFilters(): void {
+    if (this.filtersOpen()) this.store.clearColumnFilters();
+    this.filtersOpen.set(!this.filtersOpen());
   }
 
   async remove(c: Contact): Promise<void> {

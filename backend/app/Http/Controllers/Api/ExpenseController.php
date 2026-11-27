@@ -36,7 +36,19 @@ class ExpenseController extends Controller
             ->when($request->from, fn ($q, $d) => $q->where('date', '>=', $d))
             ->when($request->to, fn ($q, $d) => $q->where('date', '<=', $d));
         $this->search($q, $request->q, ['reference', 'description']);
-        $this->sort($q, $request, ['date', 'total', 'id'], '-date');
+        $this->columnFilters($q, $request, [
+            'category' => static::whereRelated('account', 'name'),
+            'description' => static::whereAny(['description', 'reference']),
+            'vendor' => static::whereRelated('contact', 'name'),
+            'paid_through' => static::whereRelated('paidThrough', 'name'),
+            'total_min' => ['total', 'min'],
+            'total_max' => ['total', 'max'],
+        ]);
+        $this->sort($q, $request, ['date', 'total', 'description', 'id'], '-date', [
+            'category' => static::orderByRelated('accounts', 'account_id', 'name'),
+            'vendor' => static::orderByRelated('contacts', 'contact_id', 'name'),
+            'paid_through' => static::orderByRelated('accounts', 'paid_through_id', 'name'),
+        ]);
 
         return $this->paginate($q->orderByDesc('expenses.id'), $request);
     }

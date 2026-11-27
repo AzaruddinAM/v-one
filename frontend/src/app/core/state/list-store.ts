@@ -38,7 +38,14 @@ export function withPaginatedList<T extends { id: number }>(endpoint: string, fi
       loaded: false,
       error: null,
     }),
-    withComputed(({ total, page, perPage, entities, loaded }) => ({
+    withComputed(({ total, page, perPage, entities, loaded, filters }) => ({
+      /** Column filters (f_*) or search typed in: an empty result then means "no matches", not "nothing yet". */
+      isFiltering: computed(() => Object.entries(filters()).some(([k, v]) => (k.startsWith('f_') || k === 'q') && v !== '' && v != null)),
+      /** Current sort as { field, dir }, from ?sort=field / -field. */
+      sortState: computed(() => {
+        const s = String(filters()['sort'] ?? '');
+        return s ? { field: s.replace(/^-/, ''), dir: s.startsWith('-') ? ('desc' as const) : ('asc' as const) } : null;
+      }),
       isEmpty: computed(() => loaded() && entities().length === 0),
       rangeLabel: computed(() => {
         if (!total()) return '0 results';
@@ -79,9 +86,30 @@ export function withPaginatedList<T extends { id: number }>(endpoint: string, fi
         ),
       );
 
+      /** Column header filters, debounced so typing doesn't fire a request per key. */
+      const reloadSoon = rxMethod<void>(pipe(debounceTime(350), tap(() => load())));
+      const filterColumn = (key: string, value: string): void => {
+        // Record the value at once (so quick typing in two boxes keeps both) and only debounce the request.
+        patchState(store, { filters: { ...store.filters(), ['f_' + key]: String(value ?? '').trim() }, page: 1 });
+        reloadSoon();
+      };
+
       return {
         load,
         search,
+        filterColumn,
+        /** Click on a column header: ascending → descending → back to the default order. */
+        toggleSort(field: string): void {
+          const cur = String(store.filters()['sort'] ?? '');
+          const next = cur === field ? '-' + field : cur === '-' + field ? '' : field;
+          patchState(store, { filters: { ...store.filters(), sort: next }, page: 1 });
+          load();
+        },
+        clearColumnFilters(): void {
+          const kept = Object.fromEntries(Object.entries(store.filters()).filter(([k]) => !k.startsWith('f_')));
+          patchState(store, { filters: kept, page: 1 });
+          load();
+        },
         setFilters(f: QueryParams): void {
           patchState(store, { filters: { ...store.filters(), ...f }, page: 1 });
           load();

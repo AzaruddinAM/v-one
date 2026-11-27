@@ -43,7 +43,14 @@ class ContactController extends Controller
             ->when($request->has('active'), fn ($q) => $q->where('is_active', $request->boolean('active')))
             ->withSum(['documents as outstanding' => fn ($d) => $d->where('type', $balanceType)->whereNotIn('status', ['draft', 'void'])], 'balance');
         $this->search($q, $request->q, ['name', 'company_name', 'email', 'phone']);
-        $this->sort($q, $request, ['name', 'created_at', 'id'], 'name');
+        $this->columnFilters($q, $request, [
+            'name' => static::whereAny(['name', 'company_name']),
+            'contact' => static::whereAny(['phone', 'email']),
+            'city' => ['city', 'like'],
+        ]);
+        $this->sort($q, $request, ['name', 'city', 'created_at', 'id'], 'name', [
+            'outstanding' => fn ($q, $dir) => $q->orderBy('outstanding', $dir),
+        ]);
 
         return $this->paginate($q, $request);
     }

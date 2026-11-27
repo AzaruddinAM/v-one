@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { injectPreferences } from '../../core/preferences';
+import { ColFilter, filterRowOpen, SortHeader } from '../../shared/table-filters';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { signalStore } from '@ngrx/signals';
@@ -21,7 +23,7 @@ export const ItemListStore = signalStore(withPaginatedList<Item>('items'));
 
 @Component({
   selector: 'app-item-list',
-  imports: [RouterLink, FormsModule, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, Modal],
+  imports: [RouterLink, FormsModule, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, Modal, SortHeader, ColFilter],
   providers: [ItemListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -41,11 +43,14 @@ export const ItemListStore = signalStore(withPaginatedList<Item>('items'));
           <button type="button" [class.is-active]="view() === 'service'" (click)="filter('service')">Services</button>
           <button type="button" [class.is-active]="view() === 'low'" (click)="filter('low')">Low stock</button>
         </div>
+        @if (prefs().table_filters) {
+          <button type="button" class="btn btn--outline btn--sm" [attr.aria-pressed]="filtersOpen()" (click)="toggleFilters()"><app-icon name="filter" [size]="16" /> {{ filtersOpen() ? 'Hide filters' : 'Filters' }}</button>
+        }
       </div>
       @if (store.loading()) {
         <div class="loading-bar"></div>
       }
-      @if (store.isEmpty()) {
+      @if (store.isEmpty() && !store.isFiltering()) {
         <app-empty-state icon="box" title="No items found" message="Add products or services to use them on invoices and bills.">
           <a routerLink="/items/new" class="btn"><app-icon name="plus" /> Add item</a>
         </app-empty-state>
@@ -53,7 +58,26 @@ export const ItemListStore = signalStore(withPaginatedList<Item>('items'));
         <div class="table-wrap">
           <table class="table">
             <thead>
-              <tr><th>Item</th><th>Type</th><th class="text-right">Sales price</th><th class="text-right">Purchase price</th><th>Tax</th><th class="text-right">Stock</th><th></th></tr>
+              <tr>
+                <th appSort="name" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Item</th>
+                <th appSort="type" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Type</th>
+                <th appSort="sales_price" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Sales price</th>
+                <th appSort="purchase_price" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Purchase price</th>
+                <th appSort="tax" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Tax</th>
+                <th appSort="stock_on_hand" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Stock</th>
+                <th></th>
+              </tr>
+              @if (showFilterRow()) {
+                <tr class="filter-row">
+                  <th><app-col-filter key="name" label="Item, SKU or HSN" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="type" kind="select" label="Type" [options]="['goods', 'service']" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="price" kind="range" label="Sales price" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="purchase" kind="range" label="Purchase price" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="tax" label="Tax" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="stock" kind="range" label="Stock" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th></th>
+                </tr>
+              }
             </thead>
             <tbody>
               @for (i of store.entities(); track i.id) {
@@ -84,6 +108,8 @@ export const ItemListStore = signalStore(withPaginatedList<Item>('items'));
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td class="no-match" colspan="7">No items match these filters.</td></tr>
               }
             </tbody>
           </table>
@@ -121,8 +147,17 @@ export class ItemList implements OnInit {
   protected adjDate = isoDate();
   protected adjNotes = '';
 
+  protected readonly prefs = injectPreferences();
+  protected readonly filtersOpen = filterRowOpen('items');
+  protected readonly showFilterRow = computed(() => this.prefs().table_filters && this.filtersOpen());
+
   ngOnInit(): void {
     this.store.load();
+  }
+
+  toggleFilters(): void {
+    if (this.filtersOpen()) this.store.clearColumnFilters();
+    this.filtersOpen.set(!this.filtersOpen());
   }
 
   filter(v: '' | 'goods' | 'service' | 'low'): void {

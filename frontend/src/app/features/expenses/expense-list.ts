@@ -13,6 +13,8 @@ import { ToastService } from '../../core/ui/toast.service';
 import { isoDate } from '../../core/utils/dates';
 import { errorMessage } from '../../core/utils/http-error';
 import { round2 } from '../../core/utils/totals';
+import { injectPreferences } from '../../core/preferences';
+import { ColFilter, filterRowOpen, SortHeader } from '../../shared/table-filters';
 import { EmptyState } from '../../shared/empty-state';
 import { FieldError } from '../../shared/field-error';
 import { Icon } from '../../shared/icon';
@@ -26,7 +28,7 @@ export const ExpenseListStore = signalStore(withPaginatedList<Expense>('expenses
 
 @Component({
   selector: 'app-expense-list',
-  imports: [DatePipe, ReactiveFormsModule, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, Modal, FieldError, Typeahead],
+  imports: [DatePipe, ReactiveFormsModule, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, Modal, FieldError, Typeahead, SortHeader, ColFilter],
   providers: [ExpenseListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -44,16 +46,26 @@ export const ExpenseListStore = signalStore(withPaginatedList<Expense>('expenses
           <option value="">All categories</option>
           @for (a of lookups.expenseAccounts(); track a.id) { <option [value]="a.id">{{ a.name }}</option> }
         </select>
+        @if (prefs().table_filters) {
+          <button type="button" class="btn btn--outline btn--sm" [attr.aria-pressed]="filtersOpen()" (click)="toggleFilters()"><app-icon name="filter" [size]="16" /> {{ filtersOpen() ? 'Hide filters' : 'Filters' }}</button>
+        }
       </div>
       @if (store.loading()) { <div class="loading-bar"></div> }
-      @if (store.isEmpty()) {
+      @if (store.isEmpty() && !store.isFiltering()) {
         <app-empty-state icon="wallet" title="No expenses recorded" message="Track spending to see your true profit.">
           <button type="button" class="btn" (click)="open()"><app-icon name="plus" /> Record expense</button>
         </app-empty-state>
       } @else {
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Vendor</th><th>Paid through</th><th class="text-right">Amount</th><th></th></tr></thead>
+            <thead>
+              <tr><th appSort="date" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Date</th><th appSort="category" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Category</th><th appSort="description" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Description</th><th appSort="vendor" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Vendor</th><th appSort="paid_through" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Paid through</th><th appSort="total" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Amount</th><th></th></tr>
+              @if (showFilterRow()) {
+                <tr class="filter-row">
+                  <th></th><th><app-col-filter key="category" label="Category" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="description" label="Description or reference" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="vendor" label="Vendor" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="paid_through" label="Paid through" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="total" kind="range" label="Amount" (changed)="store.filterColumn($event.key, $event.value)" /></th><th></th>
+                </tr>
+              }
+            </thead>
             <tbody>
               @for (e of store.entities(); track e.id) {
                 <tr class="is-clickable" (click)="open(e)">
@@ -69,6 +81,8 @@ export const ExpenseListStore = signalStore(withPaginatedList<Expense>('expenses
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td class="no-match" colspan="7">No expenses match these filters.</td></tr>
               }
             </tbody>
           </table>
@@ -162,6 +176,15 @@ export class ExpenseList implements OnInit {
       this.amount.set(Number(v.amount) || 0);
       this.taxId.set(v.tax_id ?? null);
     });
+  }
+
+  protected readonly prefs = injectPreferences();
+  protected readonly filtersOpen = filterRowOpen('expenses');
+  protected readonly showFilterRow = computed(() => this.prefs().table_filters && this.filtersOpen());
+
+  toggleFilters(): void {
+    if (this.filtersOpen()) this.store.clearColumnFilters();
+    this.filtersOpen.set(!this.filtersOpen());
   }
 
   ngOnInit(): void {

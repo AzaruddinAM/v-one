@@ -37,6 +37,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('/organization', [OrganizationController::class, 'show']);
     Route::put('/organization', [OrganizationController::class, 'update'])->middleware('role:admin');
     Route::put('/organization/lock-date', [OrganizationController::class, 'lockDate'])->middleware('role:admin');
+    Route::put('/organization/preferences', [OrganizationController::class, 'preferences'])->middleware('role:admin');
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/users', [UserController::class, 'index']);

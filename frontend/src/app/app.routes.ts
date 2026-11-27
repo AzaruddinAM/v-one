@@ -82,6 +82,7 @@ export const routes: Routes = [
           { path: 'taxes', loadComponent: () => import('./features/settings/tax-settings').then((m) => m.TaxSettings) },
           { path: 'numbering', loadComponent: () => import('./features/settings/numbering-settings').then((m) => m.NumberingSettings) },
           { path: 'locking', loadComponent: () => import('./features/settings/lock-settings').then((m) => m.LockSettings) },
+          { path: 'features', loadComponent: () => import('./features/settings/feature-settings').then((m) => m.FeatureSettings) },
           { path: 'pdf', loadComponent: () => import('./features/settings/pdf-settings').then((m) => m.PdfSettings) },
           { path: 'users', canActivate: [adminGuard], loadComponent: () => import('./features/settings/user-settings').then((m) => m.UserSettings) },
         ],

@@ -48,15 +48,23 @@ class Organization extends Model
         'name', 'phone', 'email', 'industry', 'address', 'city', 'state', 'country', 'pincode',
         'gstin', 'tax_regime', 'currency', 'currency_symbol', 'fiscal_year_start', 'date_format',
         'invoice_terms', 'invoice_notes', 'pdf_template', 'pdf_accent', 'pdf_footer', 'pdf_options',
-        'number_series', 'reminder_template', 'lock_date',
+        'number_series', 'reminder_template', 'lock_date', 'preferences',
     ];
+
+    /** Validation rules for each key of preferences (feature switches); anything else is dropped. */
+    public static function preferenceRules(): array
+    {
+        return [
+            'table_filters' => ['sometimes', 'boolean'],
+        ];
+    }
 
     /** gst = India GST (GSTIN, CGST/SGST), vat = UAE VAT (TRN, VAT return), none = plain sales tax. */
     public const TAX_REGIMES = ['gst', 'vat', 'none'];
 
     protected function casts(): array
     {
-        return ['fiscal_year_start' => 'integer', 'pdf_options' => 'array', 'number_series' => 'array', 'lock_date' => 'date:Y-m-d'];
+        return ['fiscal_year_start' => 'integer', 'pdf_options' => 'array', 'number_series' => 'array', 'preferences' => 'array', 'lock_date' => 'date:Y-m-d'];
     }
 
     public function users(): HasMany

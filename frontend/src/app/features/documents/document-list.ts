@@ -14,6 +14,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
 import { PageHeader } from '../../shared/page-header';
 import { Pagination } from '../../shared/pagination';
 import { StatusBadge } from '../../shared/status-badge';
+import { ColFilter, filterRowOpen, SortHeader } from '../../shared/table-filters';
+import { injectPreferences } from '../../core/preferences';
 
 export const DocumentListStore = signalStore(withPaginatedList<DocumentSummary>('documents'));
 
@@ -31,7 +33,7 @@ const STATUS_TABS: Record<DocumentType, string[]> = {
 
 @Component({
   selector: 'app-document-list',
-  imports: [RouterLink, DatePipe, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, StatusBadge],
+  imports: [RouterLink, DatePipe, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, StatusBadge, SortHeader, ColFilter],
   providers: [DocumentListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -56,12 +58,15 @@ const STATUS_TABS: Record<DocumentType, string[]> = {
           <input class="input" type="date" style="width:auto" aria-label="From" (change)="store.setFilters({ from: $any($event.target).value })" />
           <span class="muted">to</span>
           <input class="input" type="date" style="width:auto" aria-label="To" (change)="store.setFilters({ to: $any($event.target).value })" />
+          @if (prefs().table_filters) {
+            <button type="button" class="btn btn--outline btn--sm" [attr.aria-pressed]="filtersOpen()" (click)="toggleFilters()"><app-icon name="filter" [size]="16" /> {{ filtersOpen() ? 'Hide filters' : 'Filters' }}</button>
+          }
         </div>
       </div>
       @if (store.loading()) {
         <div class="loading-bar"></div>
       }
-      @if (store.isEmpty()) {
+      @if (store.isEmpty() && !store.isFiltering()) {
         <app-empty-state [icon]="cfg().icon" [title]="'No ' + cfg().plural.toLowerCase() + ' yet'" [message]="'Create your first ' + cfg().label.toLowerCase() + ' in a few seconds.'">
           <a [routerLink]="[cfg().path, 'new']" class="btn"><app-icon name="plus" /> New {{ cfg().label }}</a>
         </app-empty-state>
@@ -70,15 +75,27 @@ const STATUS_TABS: Record<DocumentType, string[]> = {
           <table class="table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Number</th>
-                <th>{{ cfg().contactType === 'customer' ? 'Customer' : 'Vendor' }}</th>
-                <th>{{ cfg().dueLabel }}</th>
-                <th>Status</th>
-                <th class="text-right">Amount</th>
-                @if (cfg().payable) { <th class="text-right">Balance due</th> }
+                <th appSort="date" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Date</th>
+                <th appSort="number" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Number</th>
+                <th appSort="contact" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">{{ cfg().contactType === 'customer' ? 'Customer' : 'Vendor' }}</th>
+                <th appSort="due_date" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">{{ cfg().dueLabel }}</th>
+                <th appSort="status" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Status</th>
+                <th appSort="total" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Amount</th>
+                @if (cfg().payable) { <th appSort="balance" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Balance due</th> }
                 <th></th>
               </tr>
+              @if (showFilterRow()) {
+                <tr class="filter-row">
+                  <th><app-col-filter key="date" kind="dates" label="Date" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="number" label="Number" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="contact" [label]="cfg().contactType" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="due" kind="dates" [label]="cfg().dueLabel" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="status" kind="select" label="Status" [options]="statuses()" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  <th><app-col-filter key="total" kind="range" label="Amount" (changed)="store.filterColumn($event.key, $event.value)" /></th>
+                  @if (cfg().payable) { <th><app-col-filter key="balance" kind="range" label="Balance" (changed)="store.filterColumn($event.key, $event.value)" /></th> }
+                  <th></th>
+                </tr>
+              }
             </thead>
             <tbody>
               @for (d of store.entities(); track d.id) {
@@ -99,6 +116,8 @@ const STATUS_TABS: Record<DocumentType, string[]> = {
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td class="no-match" [attr.colspan]="cfg().payable ? 8 : 7">No {{ cfg().plural.toLowerCase() }} match these filters.</td></tr>
               }
             </tbody>
           </table>
@@ -122,8 +141,17 @@ export class DocumentList implements OnInit {
     this.cfg().contactType === 'customer' ? 'Track what your customers owe you.' : 'Track what you owe your vendors.',
   );
 
+  protected readonly prefs = injectPreferences();
+  protected readonly filtersOpen = filterRowOpen('documents');
+  protected readonly showFilterRow = computed(() => this.prefs().table_filters && this.filtersOpen());
+
   ngOnInit(): void {
     this.store.setFilters({ type: this.docType() });
+  }
+
+  toggleFilters(): void {
+    if (this.filtersOpen()) this.store.clearColumnFilters();
+    this.filtersOpen.set(!this.filtersOpen());
   }
 
   setStatus(s: string, e: Event): void {

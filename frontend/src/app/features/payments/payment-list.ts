@@ -9,6 +9,8 @@ import { LookupsStore } from '../../core/state/lookups.store';
 import { withPaginatedList } from '../../core/state/list-store';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { ToastService } from '../../core/ui/toast.service';
+import { injectPreferences } from '../../core/preferences';
+import { ColFilter, filterRowOpen, SortHeader } from '../../shared/table-filters';
 import { EmptyState } from '../../shared/empty-state';
 import { Icon } from '../../shared/icon';
 import { MoneyPipe } from '../../shared/money.pipe';
@@ -20,7 +22,7 @@ export const PaymentListStore = signalStore(withPaginatedList<Payment>('payments
 
 @Component({
   selector: 'app-payment-list',
-  imports: [RouterLink, DatePipe, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, PaymentDialog],
+  imports: [RouterLink, DatePipe, Icon, MoneyPipe, PageHeader, Pagination, EmptyState, PaymentDialog, SortHeader, ColFilter],
   providers: [PaymentListStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -38,14 +40,24 @@ export const PaymentListStore = signalStore(withPaginatedList<Payment>('payments
           <option value="">All modes</option>
           @for (m of lookups.paymentModes(); track m) { <option [value]="m">{{ m.replace('_', ' ') }}</option> }
         </select>
+        @if (prefs().table_filters) {
+          <button type="button" class="btn btn--outline btn--sm" [attr.aria-pressed]="filtersOpen()" (click)="toggleFilters()"><app-icon name="filter" [size]="16" /> {{ filtersOpen() ? 'Hide filters' : 'Filters' }}</button>
+        }
       </div>
       @if (store.loading()) { <div class="loading-bar"></div> }
-      @if (store.isEmpty()) {
+      @if (store.isEmpty() && !store.isFiltering()) {
         <app-empty-state icon="card" title="No payments yet" message="Payments you record will appear here." />
       } @else {
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Date</th><th>Payment #</th><th>{{ direction() === 'in' ? 'Customer' : 'Vendor' }}</th><th>Against</th><th>Mode</th><th>Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
+            <thead>
+              <tr><th appSort="date" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Date</th><th appSort="number" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Payment #</th><th appSort="contact" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">{{ direction() === 'in' ? 'Customer' : 'Vendor' }}</th><th>Against</th><th appSort="mode" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Mode</th><th appSort="reference" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Reference</th><th appSort="amount" class="text-right" [enabled]="prefs().table_filters" [sortState]="store.sortState()" (sorted)="store.toggleSort($event)">Amount</th><th></th></tr>
+              @if (showFilterRow()) {
+                <tr class="filter-row">
+                  <th></th><th><app-col-filter key="number" label="Payment number" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="contact" label="Contact" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="against" label="Invoice or bill number" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="mode" kind="select" label="Mode" [options]="lookups.paymentModes()" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="reference" label="Reference" (changed)="store.filterColumn($event.key, $event.value)" /></th><th><app-col-filter key="amount" kind="range" label="Amount" (changed)="store.filterColumn($event.key, $event.value)" /></th><th></th>
+                </tr>
+              }
+            </thead>
             <tbody>
               @for (p of store.entities(); track p.id) {
                 <tr>
@@ -64,6 +76,8 @@ export const PaymentListStore = signalStore(withPaginatedList<Payment>('payments
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td class="no-match" colspan="8">No payments match these filters.</td></tr>
               }
             </tbody>
           </table>
@@ -88,6 +102,15 @@ export class PaymentList implements OnInit {
   protected readonly title = computed(() => (this.direction() === 'in' ? 'Payments Received' : 'Payments Made'));
   protected readonly recording = signal(false);
   protected readonly link = docPath;
+
+  protected readonly prefs = injectPreferences();
+  protected readonly filtersOpen = filterRowOpen('payments');
+  protected readonly showFilterRow = computed(() => this.prefs().table_filters && this.filtersOpen());
+
+  toggleFilters(): void {
+    if (this.filtersOpen()) this.store.clearColumnFilters();
+    this.filtersOpen.set(!this.filtersOpen());
+  }
 
   ngOnInit(): void {
     this.store.setFilters({ direction: this.direction() });

@@ -29,6 +29,8 @@ export interface Organization {
   reminder_template?: string | null;
   /** Transactions dated on or before this day cannot be added, edited or deleted. */
   lock_date?: string | null;
+  /** Feature switches, see core/preferences.ts. */
+  preferences?: Partial<import('../preferences').Preferences> | null;
 }
 
 export type TaxRegime = 'gst' | 'vat' | 'none';

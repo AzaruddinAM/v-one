@@ -41,7 +41,21 @@ class ItemController extends Controller
             ->when($request->has('active'), fn ($q) => $q->where('is_active', $request->boolean('active')))
             ->when($request->boolean('low_stock'), fn ($q) => $q->where('track_inventory', true)->whereColumn('stock_on_hand', '<=', 'reorder_level'));
         $this->search($q, $request->q, ['name', 'sku', 'hsn_code', 'category']);
-        $this->sort($q, $request, ['name', 'sales_price', 'stock_on_hand', 'created_at', 'id'], 'name');
+        $this->columnFilters($q, $request, [
+            'name' => static::whereAny(['name', 'sku', 'hsn_code']),
+            'type' => ['type', 'eq'],
+            'category' => ['category', 'like'],
+            'tax' => static::whereRelated('tax', 'name'),
+            'price_min' => ['sales_price', 'min'],
+            'price_max' => ['sales_price', 'max'],
+            'purchase_min' => ['purchase_price', 'min'],
+            'purchase_max' => ['purchase_price', 'max'],
+            'stock_min' => ['stock_on_hand', 'min'],
+            'stock_max' => ['stock_on_hand', 'max'],
+        ]);
+        $this->sort($q, $request, ['name', 'type', 'category', 'sales_price', 'purchase_price', 'stock_on_hand', 'created_at', 'id'], 'name', [
+            'tax' => static::orderByRelated('taxes', 'tax_id', 'name'),
+        ]);
 
         return $this->paginate($q, $request);
     }

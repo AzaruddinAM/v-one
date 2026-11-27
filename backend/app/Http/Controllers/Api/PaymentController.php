@@ -30,7 +30,18 @@ class PaymentController extends Controller
             $q->where(fn ($w) => $w->where('number', 'like', "%$term%")->orWhere('reference', 'like', "%$term%")
                 ->orWhereHas('contact', fn ($c) => $c->where('name', 'like', "%$term%")));
         }
-        $this->sort($q, $request, ['date', 'amount', 'number', 'id'], '-date');
+        $this->columnFilters($q, $request, [
+            'number' => ['number', 'like'],
+            'contact' => static::whereRelated('contact', 'name'),
+            'against' => static::whereRelated('document', 'number'),
+            'mode' => ['mode', 'eq'],
+            'reference' => ['reference', 'like'],
+            'amount_min' => ['amount', 'min'],
+            'amount_max' => ['amount', 'max'],
+        ]);
+        $this->sort($q, $request, ['date', 'amount', 'number', 'mode', 'reference', 'id'], '-date', [
+            'contact' => static::orderByRelated('contacts', 'contact_id', 'name'),
+        ]);
 
         return $this->paginate($q->orderByDesc('payments.id'), $request);
     }

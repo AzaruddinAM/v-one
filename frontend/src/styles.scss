@@ -461,6 +461,73 @@ a:hover {
   color: var(--muted);
 }
 
+/* Sortable headers and the filter row (Settings → Features → Table filters) */
+.th-sort {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.th-sort:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.th-sort:hover,
+.th-sort.is-sorted {
+  color: var(--text);
+}
+.th-sort__arrow {
+  font-size: 9px;
+  opacity: 0.45;
+}
+.th-sort.is-sorted .th-sort__arrow {
+  opacity: 1;
+  color: var(--primary);
+}
+.text-right .th-sort {
+  flex-direction: row-reverse;
+}
+.table tr.filter-row th {
+  padding: 6px 8px;
+  background: var(--surface);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.col-filter {
+  width: 100%;
+  min-width: 70px;
+  height: 30px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.col-filter:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.col-filter__pair {
+  display: flex;
+  gap: 4px;
+}
+.col-filter__pair .col-filter {
+  min-width: 64px;
+}
+.col-filter__pair--dates .col-filter {
+  min-width: 118px;
+}
+.table td.no-match {
+  text-align: center;
+  color: var(--muted);
+  padding: 28px 16px;
+}
+
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex;

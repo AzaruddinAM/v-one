@@ -99,6 +99,23 @@ class OrganizationController extends Controller
         return $org->fresh();
     }
 
+    /** Feature switches (Settings → Features). Only the keys sent are changed; the rest are kept. */
+    public function preferences(Request $request)
+    {
+        $org = $request->user()->organization;
+        abort_unless(Schema::hasColumn('organizations', 'preferences'), 422, 'Run the database upgrade first (php artisan migrate).');
+        $rules = Organization::preferenceRules();
+        $data = $request->validate($rules);
+        foreach ($data as $key => $value) {
+            if (in_array('boolean', $rules[$key], true)) {
+                $data[$key] = (bool) $value;
+            }
+        }
+        $org->update(['preferences' => array_merge($org->preferences ?? [], $data)]);
+
+        return $org->fresh();
+    }
+
     /** Transactions dated on or before the lock date cannot be created, edited or deleted. */
     public function lockDate(Request $request)
     {
