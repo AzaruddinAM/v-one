@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
 
 /** Whether the filter row of a list is open; remembered in this browser per list. */
@@ -31,16 +32,19 @@ export interface SortState {
  */
 @Component({
   selector: 'th[appSort]',
+  imports: [NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[attr.aria-sort]': 'aria()' },
   template: `
+    <!-- Projected once into a template, so the label shows whether or not sorting is on. -->
+    <ng-template #label><ng-content /></ng-template>
     @if (enabled()) {
-      <button type="button" class="th-sort" [class.is-sorted]="dir()" (click)="sorted.emit(appSort())" [title]="'Sort by ' + appSort()">
-        <ng-content />
+      <button type="button" class="th-sort" [class.is-sorted]="dir()" (click)="sorted.emit(appSort())">
+        <ng-container [ngTemplateOutlet]="label" />
         <span class="th-sort__arrow" aria-hidden="true">{{ dir() === 'asc' ? '▲' : dir() === 'desc' ? '▼' : '↕' }}</span>
       </button>
     } @else {
-      <ng-content />
+      <ng-container [ngTemplateOutlet]="label" />
     }
   `,
 })
