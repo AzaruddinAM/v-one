@@ -1,4 +1,4 @@
-import { amountInWords, DEFAULT_PDF_OPTIONS, numberToWords, orgPdfAccent, orgPdfOptions, orgPdfTemplate } from './pdf-templates';
+import { amountInWords, ARABIC_TITLES, DEFAULT_PDF_OPTIONS, numberToWords, orgPdfAccent, orgPdfOptions, orgPdfTemplate, PDF_TEMPLATES, pdfTemplatesFor } from './pdf-templates';
 
 describe('numberToWords', () => {
   it('spells small numbers', () => {
@@ -55,5 +55,28 @@ describe('orgPdfOptions', () => {
     expect(o.font).toBe('serif');
     expect(o.show_notes).toBe(true);
     expect((o as never as Record<string, unknown>)['hack']).toBeUndefined();
+  });
+});
+
+describe('template list', () => {
+  it('has unique ids', () => {
+    const ids = PDF_TEMPLATES.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('offers the UAE bilingual layout to VAT organizations only', () => {
+    expect(pdfTemplatesFor({ tax_regime: 'vat' }).some((t) => t.id === 'bilingual')).toBe(true);
+    expect(pdfTemplatesFor({ tax_regime: 'gst' }).some((t) => t.id === 'bilingual')).toBe(false);
+    expect(pdfTemplatesFor(null).some((t) => t.id === 'elegant')).toBe(true);
+  });
+
+  it('keeps a saved new template', () => {
+    expect(orgPdfTemplate({ pdf_template: 'creative' } as never)).toBe('creative');
+  });
+
+  it('has Arabic titles for invoices, estimates and purchase orders', () => {
+    expect(ARABIC_TITLES.tax_invoice).toBe('فاتورة ضريبية');
+    expect(ARABIC_TITLES.estimate).toBeTruthy();
+    expect(ARABIC_TITLES.purchase_order).toBeTruthy();
   });
 });

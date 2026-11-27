@@ -1,20 +1,34 @@
-import { Organization, PdfOptions, PdfTemplateId } from './api/models';
+import { DocumentType, Organization, PdfOptions, PdfTemplateId, TaxRegime } from './api/models';
 
 export interface PdfTemplate {
   id: PdfTemplateId;
   label: string;
   description: string;
+  /** Only offered to organizations in these tax regimes (all when omitted). */
+  regimes?: readonly TaxRegime[];
 }
 
-/** Layouts for printed / PDF invoices, estimates and other documents. Styles live in document-view.scss (`.tpl-<id>`). */
+/** Layouts for printed / PDF invoices, estimates, purchase orders and other documents. Styles live in document-sheet.scss (`.tpl-<id>`). */
 export const PDF_TEMPLATES: readonly PdfTemplate[] = [
   { id: 'classic', label: 'Classic', description: 'Clean layout with a dark item table. The original v-one look.' },
   { id: 'modern', label: 'Modern', description: 'Colour header band with your accent colour and soft rows.' },
   { id: 'minimal', label: 'Minimal', description: 'Black and white, thin lines, lots of white space. Ink friendly.' },
   { id: 'gst', label: 'GST Tax Invoice', description: 'Boxed Indian tax-invoice format with bordered cells and signature box.' },
+  { id: 'standard', label: 'Standard', description: 'Familiar business format: details in boxes, striped rows, totals panel.' },
+  { id: 'elegant', label: 'Elegant', description: 'Serif letterhead centred between fine double rules. Premium feel.' },
+  { id: 'bold', label: 'Bold', description: 'Oversized title, black table header and a solid colour total bar.' },
+  { id: 'corporate', label: 'Corporate', description: 'Colour side stripe, info cards for customer and details, boxed total.' },
+  { id: 'creative', label: 'Creative', description: 'Curved colour corner, rounded cards and pill headings. Stands out.' },
+  { id: 'bilingual', label: 'UAE Bilingual', description: 'English and Arabic labels, as UAE tax invoices usually show.', regimes: ['vat'] },
 ];
 
-export const PDF_ACCENTS: readonly string[] = ['#4f46e5', '#2563eb', '#0f766e', '#15803d', '#b45309', '#be123c', '#7c3aed', '#1e293b'];
+/** Templates an organization can pick, given its tax regime. */
+export function pdfTemplatesFor(org: Pick<Organization, 'tax_regime'> | null | undefined): readonly PdfTemplate[] {
+  const regime: TaxRegime = org?.tax_regime ?? 'gst';
+  return PDF_TEMPLATES.filter((t) => !t.regimes || t.regimes.includes(regime));
+}
+
+export const PDF_ACCENTS: readonly string[] = ['#4f46e5', '#2563eb', '#0e7490', '#0f766e', '#15803d', '#a16207', '#b45309', '#be123c', '#7c3aed', '#1e293b'];
 
 export const DEFAULT_PDF_TEMPLATE: PdfTemplateId = 'classic';
 export const DEFAULT_PDF_ACCENT = '#4f46e5';
@@ -141,3 +155,45 @@ export function amountInWords(amount: number, currency = 'INR'): string {
   if (fraction) text += ` and ${numberToWords(fraction)} ${minor}`;
   return `${text} Only`;
 }
+
+/** Arabic labels printed under the English ones by the UAE Bilingual template. */
+export const ARABIC_LABELS = {
+  billTo: 'فاتورة إلى',
+  vendor: 'المورد',
+  number: 'الرقم',
+  date: 'التاريخ',
+  terms: 'شروط الدفع',
+  due: 'تاريخ الاستحقاق',
+  validTill: 'صالح حتى',
+  reference: 'المرجع',
+  trn: 'الرقم الضريبي',
+  item: 'الصنف والوصف',
+  qty: 'الكمية',
+  rate: 'السعر',
+  discount: 'الخصم',
+  tax: 'ضريبة القيمة المضافة',
+  amount: 'المبلغ',
+  subtotal: 'المجموع الفرعي',
+  adjustment: 'تعديل',
+  total: 'الإجمالي',
+  payments: 'المدفوعات',
+  balance: 'الرصيد المستحق',
+  words: 'المبلغ بالحروف',
+  notes: 'ملاحظات',
+  tnc: 'الشروط والأحكام',
+  signatory: 'المفوض بالتوقيع',
+} as const;
+
+export const ARABIC_TITLES: Partial<Record<DocumentType | 'tax_invoice' | 'tax_credit_note', string>> = {
+  tax_invoice: 'فاتورة ضريبية',
+  tax_credit_note: 'إشعار دائن ضريبي',
+  invoice: 'فاتورة',
+  estimate: 'عرض سعر',
+  sales_order: 'أمر بيع',
+  delivery_challan: 'إشعار تسليم',
+  retainer_invoice: 'فاتورة دفعة مقدمة',
+  credit_note: 'إشعار دائن',
+  purchase_order: 'أمر شراء',
+  bill: 'فاتورة مشتريات',
+  vendor_credit: 'إشعار دائن من المورد',
+};

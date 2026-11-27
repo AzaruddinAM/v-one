@@ -7,7 +7,7 @@ import { isoDate } from '../../core/utils/dates';
 import { mailtoLink, reminderText, whatsappLink } from '../reminders/reminder-text';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG, docPath } from '../../core/documents.config';
-import { orgPdfAccent, orgPdfOptions, orgPdfTemplate, PAPER_SIZES, PDF_TEMPLATES } from '../../core/pdf-templates';
+import { orgPdfAccent, orgPdfOptions, orgPdfTemplate, PAPER_SIZES, pdfTemplatesFor } from '../../core/pdf-templates';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
@@ -54,7 +54,7 @@ import { RetainerPanel } from './retainer-panel';
         <label class="tpl-pick" title="PDF template">
           <span class="sr-only">PDF template</span>
           <select class="select select--sm" [value]="tpl()" (change)="pickTemplate($event)">
-            @for (t of templates; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+            @for (t of templates(); track t.id) { <option [value]="t.id">{{ t.label }}</option> }
           </select>
         </label>
         <button type="button" class="btn btn--outline btn--sm" (click)="print()" title="Print or save as PDF"><app-icon name="print" [size]="16" /> PDF / Print</button>
@@ -143,7 +143,7 @@ export class DocumentView implements OnInit {
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
   protected readonly org = this.auth.organization;
   protected readonly link = docPath;
-  protected readonly templates = PDF_TEMPLATES;
+  protected readonly templates = computed(() => pdfTemplatesFor(this.org()));
   /** Template used on screen and in the PDF: the organization default, or a one-off pick from the toolbar. */
   private readonly picked = signal<PdfTemplateId | null>(null);
   protected readonly tpl = computed<PdfTemplateId>(() => this.picked() ?? orgPdfTemplate(this.org()));

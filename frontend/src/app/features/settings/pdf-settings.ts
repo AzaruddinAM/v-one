@@ -4,7 +4,7 @@ import { ApiService } from '../../core/api/api.service';
 import { Document, Organization, PdfOptions, PdfTemplateId } from '../../core/api/models';
 import { taxProfile } from '../../core/tax-regime';
 import { AuthStore } from '../../core/auth/auth.store';
-import { DEFAULT_PDF_OPTIONS, orgPdfAccent, orgPdfOptions, orgPdfTemplate, PDF_ACCENTS, PDF_TEMPLATES } from '../../core/pdf-templates';
+import { DEFAULT_PDF_OPTIONS, orgPdfAccent, orgPdfOptions, orgPdfTemplate, PDF_ACCENTS, pdfTemplatesFor } from '../../core/pdf-templates';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
 import { resizeImage } from '../../core/utils/image';
@@ -38,6 +38,29 @@ const SAMPLE: Document = {
   terms: 'Goods once sold will not be taken back. Interest @18% p.a. on overdue bills.',
 } as Document;
 
+/** UAE VAT sample: dirhams, TRN and 5% VAT. */
+const SAMPLE_VAT: Document = {
+  ...SAMPLE,
+  contact: { id: 0, type: 'customer', name: 'Al Noor Trading', company_name: 'Al Noor Trading LLC', billing_address: 'Office 1204, Bay Square 3\nBusiness Bay, Dubai', gstin: '100234567800003', state: 'Dubai' } as never,
+  items: [
+    { name: 'LED Fairy Lights 10 m', description: 'Warm white, outdoor rated', quantity: 20, unit: 'pcs', rate: 45, discount_percent: 5, tax_rate: 5, amount: 855 },
+    { name: 'Curtain Light 3 x 3 m', description: '300 LEDs with remote', quantity: 8, unit: 'pcs', rate: 120, discount_percent: 0, tax_rate: 5, amount: 960 },
+    { name: 'Installation', description: null, quantity: 1, unit: '', rate: 350, discount_percent: 0, tax_rate: 5, amount: 350 },
+  ],
+  subtotal: 2165,
+  tax_total: 108.25,
+  adjustment: -0.25,
+  total: 2273,
+  amount_paid: 1000,
+  balance: 1273,
+  terms: 'Prices in AED. Goods remain our property until paid in full.',
+} as Document;
+
+const VENDORS: Record<'gst' | 'vat', Document['contact']> = {
+  gst: { id: 0, type: 'vendor', name: 'Sri Lakshmi Paper Mills', company_name: 'Sri Lakshmi Paper Mills Pvt Ltd', billing_address: 'Plot 22, Industrial Estate\nCoimbatore, Tamil Nadu 641021', gstin: '33AAFCS4821M1Z9', state: 'Tamil Nadu' } as never,
+  vat: { id: 0, type: 'vendor', name: 'Bright Star Electricals', company_name: 'Bright Star Electricals FZE', billing_address: 'Warehouse 7, Al Quoz Industrial 3\nDubai', gstin: '100398765400003', state: 'Dubai' } as never,
+};
+
 /** Settings → PDF templates: layout, colours, logo, header, columns, footer, signature and paper for every printed document. */
 @Component({
   selector: 'app-pdf-settings',
@@ -54,9 +77,10 @@ const SAMPLE: Document = {
               <h3>Template</h3>
               <p class="muted hint">Used for invoices, estimates and every other document when you print or save as PDF. You can still switch template for one document from its toolbar.</p>
               <div class="tpl-grid" [style.--accent]="accent()">
-                @for (t of templates; track t.id) {
+                @for (t of templates(); track t.id) {
                   <button type="button" class="tpl-card" [class.is-on]="template() === t.id" (click)="template.set(t.id)" [attr.aria-pressed]="template() === t.id">
                     <div class="thumb" [class]="'thumb--' + t.id" aria-hidden="true">
+                      <s></s>
                       <div class="hd"><b></b><em></em></div>
                       <div class="meta"><i></i><i></i></div>
                       <div class="rows"><i></i><i></i><i></i><i></i></div>
@@ -222,6 +246,7 @@ const SAMPLE: Document = {
           <div class="seg seg--sm">
             <button type="button" [class.is-on]="sampleType() === 'invoice'" (click)="sampleType.set('invoice')">Invoice</button>
             <button type="button" [class.is-on]="sampleType() === 'estimate'" (click)="sampleType.set('estimate')">Estimate</button>
+            <button type="button" [class.is-on]="sampleType() === 'purchase_order'" (click)="sampleType.set('purchase_order')">Purchase order</button>
           </div>
         </div>
         <div class="preview__paper">
@@ -236,7 +261,6 @@ export class PdfSettings implements OnInit {
   private readonly api = inject(ApiService);
   private readonly toast = inject(ToastService);
   protected readonly auth = inject(AuthStore);
-  protected readonly templates = PDF_TEMPLATES;
   protected readonly accents = PDF_ACCENTS;
   protected readonly positions: [PdfOptions['logo_position'], string][] = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
   protected readonly sizes: [PdfOptions['logo_size'], string][] = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
@@ -264,15 +288,23 @@ export class PdfSettings implements OnInit {
   protected readonly footer = signal(this.auth.organization()?.pdf_footer ?? '');
   protected readonly o = signal<PdfOptions>(orgPdfOptions(this.auth.organization()));
   protected readonly saving = signal(false);
-  protected readonly sampleType = signal<'invoice' | 'estimate'>('invoice');
+  protected readonly sampleType = signal<'invoice' | 'estimate' | 'purchase_order'>('invoice');
   private readonly org = signal<Organization | null>(this.auth.organization());
+  protected readonly templates = computed(() => pdfTemplatesFor(this.org()));
 
   protected readonly previewOrg = computed(() => this.org());
-  protected readonly sample = computed<Document>(() =>
-    this.sampleType() === 'invoice'
-      ? SAMPLE
-      : { ...SAMPLE, type: 'estimate', number: 'EST-00017', amount_paid: 0, balance: SAMPLE.total, reference: null },
-  );
+  protected readonly sample = computed<Document>(() => {
+    const vat = this.org()?.tax_regime === 'vat';
+    const base = vat ? SAMPLE_VAT : SAMPLE;
+    switch (this.sampleType()) {
+      case 'estimate':
+        return { ...base, type: 'estimate', number: 'EST-00017', amount_paid: 0, balance: base.total, reference: null };
+      case 'purchase_order':
+        return { ...base, type: 'purchase_order', number: 'PO-00008', contact: VENDORS[vat ? 'vat' : 'gst'], amount_paid: 0, balance: base.total, reference: null, notes: 'Please deliver to our main warehouse.', terms: 'Deliver within 7 days. Invoice must quote this PO number.' };
+      default:
+        return base;
+    }
+  });
 
   ngOnInit(): void {
     this.api.get<Organization>('organization').subscribe((o) => {

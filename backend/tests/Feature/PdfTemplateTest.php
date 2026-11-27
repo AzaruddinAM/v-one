@@ -105,4 +105,15 @@ class PdfTemplateTest extends TestCase
             'logo' => 'data:image/png;base64,'.str_repeat('A', 500_001),
         ]]))->assertUnprocessable()->assertJsonValidationErrors(['pdf_options.logo']);
     }
+
+    #[Test]
+    public function the_new_layouts_can_be_saved(): void
+    {
+        $this->signIn();
+
+        foreach (['standard', 'elegant', 'bold', 'corporate', 'creative', 'bilingual'] as $template) {
+            $this->putJson('/api/organization', $this->payload(['pdf_template' => $template]))->assertOk()
+                ->assertJsonPath('pdf_template', $template);
+        }
+    }
 }
