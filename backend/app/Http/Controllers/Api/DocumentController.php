@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\Document;
+use App\Models\Organization;
 use App\Services\DocumentService;
 use App\Services\NumberGenerator;
 use App\Support\Tenant;
@@ -43,6 +44,7 @@ class DocumentController extends Controller
             'items.*.rate' => ['required', 'numeric', 'min:0'],
             'items.*.discount_percent' => ['nullable', 'numeric', 'between:0,100'],
             'items.*.tax_id' => ['nullable', Tenant::exists('taxes')],
+            'items.*.image' => Organization::lineImageRule(),
         ];
     }
 

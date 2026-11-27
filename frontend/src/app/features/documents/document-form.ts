@@ -14,6 +14,8 @@ import { ToastService } from '../../core/ui/toast.service';
 import { addDays, isoDate } from '../../core/utils/dates';
 import { errorMessage, fieldErrors } from '../../core/utils/http-error';
 import { calculateTotals } from '../../core/utils/totals';
+import { resizeImage } from '../../core/utils/image';
+import { injectPreferences, lineImagesFor } from '../../core/preferences';
 import { FieldError } from '../../shared/field-error';
 import { Icon } from '../../shared/icon';
 import { MoneyPipe } from '../../shared/money.pipe';
@@ -162,7 +164,18 @@ const SEND_STATUS: Record<DocumentType, string> = {
                       (picked)="pickItem(i, $event)"
                     />
                     <input class="input input--sm desc" formControlName="description" placeholder="Description (optional)" />
-                    <app-field-error [server]="errors()['items.' + i + '.name']" />
+                    @if (lineImages()) {
+                      <div class="line-photo">
+                        @if (line.controls.image.value; as src) {
+                          <img [src]="src" alt="Photo of {{ line.controls.name.value || 'this item' }}" />
+                          <label class="btn btn--ghost btn--sm">Change<input type="file" accept="image/*" hidden (change)="attachImage(i, $event)" /></label>
+                          <button type="button" class="btn btn--ghost btn--sm" (click)="line.controls.image.setValue(null)">Remove</button>
+                        } @else {
+                          <label class="btn btn--ghost btn--sm"><app-icon name="upload" [size]="14" /> Add photo<input type="file" accept="image/*" hidden (change)="attachImage(i, $event)" /></label>
+                        }
+                      </div>
+                    }
+                    <app-field-error [server]="errors()['items.' + i + '.name'] || errors()['items.' + i + '.image']" />
                   </td>
                   <td><input class="input input--sm text-right" type="number" min="0" step="any" formControlName="quantity" /></td>
                   <td><input class="input input--sm text-right" type="number" min="0" step="0.01" formControlName="rate" /></td>
@@ -241,6 +254,9 @@ export class DocumentForm implements OnInit {
   readonly recurring = input(false);
 
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
+  private readonly prefs = injectPreferences();
+  /** Settings → Features → Line item photos is on for this document type. */
+  protected readonly lineImages = computed(() => lineImagesFor(this.prefs(), this.docType()));
   protected readonly sendStatus = computed(() => SEND_STATUS[this.docType()]);
   protected readonly saving = signal(false);
   protected readonly errors = signal<Record<string, string>>({});
@@ -324,8 +340,9 @@ export class DocumentForm implements OnInit {
     }
   }
 
-  newLine(l: Partial<{ item_id: number | null; name: string; description: string | null; quantity: number; unit: string | null; rate: number; discount_percent: number; tax_id: number | null }> = {}) {
+  newLine(l: Partial<{ item_id: number | null; name: string; description: string | null; quantity: number; unit: string | null; rate: number; discount_percent: number; tax_id: number | null; image: string | null }> = {}) {
     return this.fb.group({
+      image: [l.image ?? (null as string | null)],
       item_id: [l.item_id ?? (null as number | null)],
       name: [l.name ?? '', Validators.required],
       description: [l.description ?? ''],
@@ -351,8 +368,26 @@ export class DocumentForm implements OnInit {
 
   pickItem(index: number, item: Item): void {
     const line = this.lines.at(index) as FormGroup;
-    line.patchValue({ item_id: item.id, name: item.name, description: item.description ?? '', unit: item.unit, rate: this.priceOf(item), tax_id: item.tax_id ?? null });
+    line.patchValue({ item_id: item.id, name: item.name, description: item.description ?? '', unit: item.unit, rate: this.priceOf(item), tax_id: item.tax_id ?? null, image: null });
+    // Lists don't carry the photo itself; fetch it only when photos are switched on for this document type.
+    if (item.has_image && this.lineImages()) {
+      this.api.get<Item>(`items/${item.id}`).subscribe((full) => {
+        if (line.value.item_id === item.id && !line.value.image) line.patchValue({ image: full.image ?? null });
+      });
+    }
     if (index === this.lines.length - 1) this.addLine();
+  }
+
+  async attachImage(index: number, e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      this.lines.at(index).patchValue({ image: await resizeImage(file, 600, 600, 300_000) });
+    } catch (err) {
+      this.toast.error((err as Error).message);
+    }
   }
 
   pickContact(c: Contact): void {

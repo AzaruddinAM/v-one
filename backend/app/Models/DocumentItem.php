@@ -11,7 +11,7 @@ class DocumentItem extends Model
 
     protected $fillable = [
         'item_id', 'name', 'description', 'quantity', 'unit', 'rate', 'discount_percent',
-        'tax_id', 'tax_rate', 'tax_amount', 'amount', 'sort',
+        'tax_id', 'tax_rate', 'tax_amount', 'amount', 'sort', 'image',
     ];
 
     protected function casts(): array

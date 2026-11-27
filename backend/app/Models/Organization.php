@@ -56,7 +56,21 @@ class Organization extends Model
     {
         return [
             'table_filters' => ['sometimes', 'boolean'],
+            // Product photos on document lines and in the printed PDF.
+            'line_images' => ['sometimes', 'boolean'],
+            'line_image_docs' => ['sometimes', 'array'],
+            'line_image_docs.*' => [\Illuminate\Validation\Rule::in(Document::TYPES)],
+            'line_image_size' => ['sometimes', 'in:s,m,l'],
+            'line_image_layout' => ['sometimes', 'in:column,below,gallery'],
         ];
+    }
+
+    /** Line / item photos are data URLs resized in the browser; keep each one small. */
+    public const LINE_IMAGE_MAX = 350_000;
+
+    public static function lineImageRule(): array
+    {
+        return ['nullable', 'string', 'max:'.self::LINE_IMAGE_MAX, 'regex:/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/'];
     }
 
     /** gst = India GST (GSTIN, CGST/SGST), vat = UAE VAT (TRN, VAT return), none = plain sales tax. */

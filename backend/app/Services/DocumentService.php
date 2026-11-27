@@ -60,7 +60,7 @@ class DocumentService
 
             $document->items()->delete();
             $document->items()->createMany(collect($calc['lines'])->map(fn ($l) => collect($l)->only([
-                'item_id', 'name', 'description', 'quantity', 'unit', 'rate', 'discount_percent',
+                'item_id', 'name', 'description', 'quantity', 'unit', 'rate', 'discount_percent', 'image',
                 'tax_id', 'tax_rate', 'tax_amount', 'amount', 'sort',
             ])->all())->all());
 
@@ -123,7 +123,7 @@ class DocumentService
             'terms' => $source->terms,
             'converted_from_id' => $source->id,
             'items' => $source->items->map(fn ($l) => $l->only([
-                'item_id', 'name', 'description', 'quantity', 'unit', 'rate', 'discount_percent', 'tax_id',
+                'item_id', 'name', 'description', 'quantity', 'unit', 'rate', 'discount_percent', 'tax_id', 'image',
             ]))->all(),
         ];
 

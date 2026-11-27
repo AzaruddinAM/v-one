@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ApiService } from '../../core/api/api.service';
-import { Organization } from '../../core/api/models';
+import { DocumentType, Organization } from '../../core/api/models';
+import { DOC_CONFIG } from '../../core/documents.config';
 import { AuthStore } from '../../core/auth/auth.store';
 import { injectPreferences, Preferences } from '../../core/preferences';
 import { ToastService } from '../../core/ui/toast.service';
@@ -29,11 +30,61 @@ import { errorMessage } from '../../core/utils/http-error';
         <p class="muted small">Click a column title to sort by it (again to reverse, a third time to reset). A <strong>Filters</strong> button above each list opens a row of boxes to filter by number, customer, status, dates and amount ranges.</p>
       </div>
     </fieldset>
+
+    <fieldset class="card" [disabled]="!auth.isAdmin() || saving()">
+      <div class="card__header">
+        <div>
+          <h2>Line item photos</h2>
+          <p class="muted">Show product photos on estimates and other documents, in the app and on the PDF. Add a photo to an item once, or to any single line.</p>
+        </div>
+      </div>
+      <div class="card__body grid">
+        <label class="checkbox">
+          <input type="checkbox" [checked]="prefs().line_images" (change)="save({ line_images: $any($event.target).checked })" />
+          Allow photos on document lines
+        </label>
+        @if (prefs().line_images) {
+          <div>
+            <span class="label">Show on</span>
+            <div class="types">
+              @for (t of docTypes; track t.type) {
+                <label class="checkbox"><input type="checkbox" [checked]="prefs().line_image_docs.includes(t.type)" (change)="toggleDoc(t.type, $any($event.target).checked)" /> {{ t.plural }}</label>
+              }
+            </div>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Where on the PDF</span>
+              <select class="select" [value]="prefs().line_image_layout" (change)="save({ line_image_layout: $any($event.target).value })">
+                <option value="column">Thumbnail beside the item name</option>
+                <option value="below">Larger photo under the item</option>
+                <option value="gallery">Photo gallery after the items table</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Photo size</span>
+              <select class="select" [value]="prefs().line_image_size" (change)="save({ line_image_size: $any($event.target).value })">
+                <option value="s">Small</option>
+                <option value="m">Medium</option>
+                <option value="l">Large</option>
+              </select>
+            </label>
+          </div>
+          <p class="muted small">Photos are shrunk to at most 600 × 600 px when uploaded, so PDFs stay light.</p>
+        }
+      </div>
+    </fieldset>
   `,
   styles: `
     fieldset.card { border: 1px solid var(--border); padding: 0; margin: 0 0 16px; min-width: 0; }
     .small { font-size: 12.5px; margin: 6px 0 0 26px; }
     .mb-2 { margin-bottom: 12px; }
+    .grid { display: grid; gap: 14px; }
+    .types { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 6px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .row .field { display: flex; flex-direction: column; gap: 4px; min-width: 240px; }
+    .label { font-weight: 600; font-size: 13px; }
+    .grid .small { margin-left: 0; }
   `,
 })
 export class FeatureSettings {
@@ -42,6 +93,13 @@ export class FeatureSettings {
   protected readonly auth = inject(AuthStore);
   protected readonly prefs = injectPreferences();
   protected readonly saving = signal(false);
+
+  protected readonly docTypes = Object.values(DOC_CONFIG);
+
+  toggleDoc(type: DocumentType, on: boolean): void {
+    const cur = this.prefs().line_image_docs.filter((t) => t !== type);
+    this.save({ line_image_docs: on ? [...cur, type] : cur });
+  }
 
   save(patch: Partial<Preferences>): void {
     this.saving.set(true);

@@ -1087,3 +1087,53 @@ a:hover {
     margin: 12mm;
   }
 }
+
+/* Line item photos on the printed document (Settings → Features → Line item photos).
+   Global so the document-sheet component stays inside its style budget. */
+.sheet .li--column {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sheet .li__img {
+  display: block;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  break-inside: avoid;
+}
+.sheet .li__img--s { width: 36px; height: 36px; }
+.sheet .li__img--m { width: 56px; height: 56px; }
+.sheet .li__img--l { width: 84px; height: 84px; }
+.sheet .li__img--below { margin-top: 6px; width: auto; height: auto; }
+.sheet .li__img--below.li__img--s { max-width: 110px; max-height: 110px; }
+.sheet .li__img--below.li__img--m { max-width: 170px; max-height: 170px; }
+.sheet .li__img--below.li__img--l { max-width: 260px; max-height: 260px; }
+.sheet .li-gallery {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 4px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--li-tile, 150px), 1fr));
+}
+.sheet .li-gallery--s { --li-tile: 100px; }
+.sheet .li-gallery--m { --li-tile: 150px; }
+.sheet .li-gallery--l { --li-tile: 220px; }
+.sheet .li-gallery figure {
+  margin: 0;
+  break-inside: avoid;
+}
+.sheet .li-gallery img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #fff;
+}
+.sheet .li-gallery figcaption {
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--muted);
+}

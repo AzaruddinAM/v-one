@@ -74,3 +74,19 @@
     grid-template-columns: 1fr;
   }
 }
+.line-photo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.line-photo img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.line-photo label {
+  cursor: pointer;
+}

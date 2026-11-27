@@ -5,6 +5,7 @@ import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG } from '../../core/documents.config';
 import { amountInWords, ARABIC_LABELS, ARABIC_TITLES, DEFAULT_PDF_OPTIONS, PDF_FONTS } from '../../core/pdf-templates';
 import { taxProfile } from '../../core/tax-regime';
+import { lineImagesFor, preferencesOf } from '../../core/preferences';
 import { calculateTotals } from '../../core/utils/totals';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -99,7 +100,19 @@ import { MoneyPipe } from '../../shared/money.pipe';
             @for (l of d.items; track $index) {
               <tr>
                 <td class="muted">{{ $index + 1 }}</td>
-                <td><strong>{{ l.name }}</strong>@if (l.description && o.show_item_description) { <span class="sub">{{ l.description }}</span> }</td>
+                @if (img(); as im) {
+                  <td>
+                    <div [class]="'li li--' + im.layout">
+                      @if (l.image && im.layout === 'column') { <img [src]="l.image" alt="" [class]="'li__img li__img--' + im.size" /> }
+                      <div>
+                        <strong>{{ l.name }}</strong>@if (l.description && o.show_item_description) { <span class="sub">{{ l.description }}</span> }
+                        @if (l.image && im.layout === 'below') { <img [src]="l.image" alt="" [class]="'li__img li__img--below li__img--' + im.size" /> }
+                      </div>
+                    </div>
+                  </td>
+                } @else {
+                  <td><strong>{{ l.name }}</strong>@if (l.description && o.show_item_description) { <span class="sub">{{ l.description }}</span> }</td>
+                }
                 <td class="text-right mono">{{ l.quantity }} {{ l.unit }}</td>
                 <td class="text-right mono">{{ l.rate | money: false }}</td>
                 @if (o.show_discount_column) { <td class="text-right mono">{{ l.discount_percent ? l.discount_percent + '%' : '—' }}</td> }
@@ -110,6 +123,16 @@ import { MoneyPipe } from '../../shared/money.pipe';
           </tbody>
         </table>
       </div>
+
+      @if (img()?.layout === 'gallery') {
+        <section [class]="'li-gallery li-gallery--' + img()!.size">
+          @for (l of d.items; track $index) {
+            @if (l.image) {
+              <figure><img [src]="l.image" alt="" /><figcaption>{{ $index + 1 }}. {{ l.name }}</figcaption></figure>
+            }
+          }
+        </section>
+      }
 
       <section class="sheet__foot">
         <div class="notes">
@@ -198,6 +221,13 @@ export class DocumentSheet {
     if (d.type === 'invoice' && registered) return ARABIC_TITLES.tax_invoice;
     if (d.type === 'credit_note' && registered) return ARABIC_TITLES.tax_credit_note;
     return ARABIC_TITLES[d.type] ?? '';
+  });
+  /** Line photos (Settings → Features), only when switched on for this type and at least one line has a photo. */
+  protected readonly img = computed(() => {
+    const p = preferencesOf(this.org() ?? this.auth?.organization());
+    const d = this.doc();
+    if (!lineImagesFor(p, d.type) || !(d.items ?? []).some((l) => !!l.image)) return null;
+    return { size: p.line_image_size, layout: p.line_image_layout };
   });
   protected readonly breakup = computed(() => calculateTotals(this.doc().items ?? []).taxBreakup);
   protected readonly words = computed(() => amountInWords(this.doc().total ?? 0, this.auth?.currency() ?? 'INR'));

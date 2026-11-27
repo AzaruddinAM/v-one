@@ -13,8 +13,18 @@ class Item extends Model
 
     protected $fillable = [
         'name', 'sku', 'type', 'unit', 'hsn_code', 'category', 'description', 'sales_price',
-        'purchase_price', 'tax_id', 'track_inventory', 'stock_on_hand', 'reorder_level', 'is_active',
+        'purchase_price', 'tax_id', 'track_inventory', 'stock_on_hand', 'reorder_level', 'is_active', 'image',
     ];
+
+    /** The photo is only sent when one item is opened (GET items/{id}); lists get has_image instead. */
+    protected $hidden = ['image'];
+
+    protected $appends = ['has_image'];
+
+    public function getHasImageAttribute(): bool
+    {
+        return ! empty($this->attributes['image'] ?? null);
+    }
 
     protected function casts(): array
     {

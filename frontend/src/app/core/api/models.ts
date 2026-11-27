@@ -174,6 +174,9 @@ export interface Item {
   track_inventory?: boolean;
   stock_on_hand?: number;
   reorder_level?: number;
+  /** Product photo (data URL); only included when one item is fetched. Lists send has_image. */
+  image?: string | null;
+  has_image?: boolean;
   is_active?: boolean;
 }
 
@@ -201,6 +204,8 @@ export interface DocumentLine {
   tax_rate?: number;
   tax_amount?: number;
   amount?: number;
+  /** Product photo for this line (data URL). */
+  image?: string | null;
 }
 
 export interface DocumentSummary {

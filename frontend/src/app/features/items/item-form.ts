@@ -7,6 +7,7 @@ import { Item } from '../../core/api/models';
 import { LookupsStore } from '../../core/state/lookups.store';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage, fieldErrors } from '../../core/utils/http-error';
+import { resizeImage } from '../../core/utils/image';
 import { FieldError } from '../../shared/field-error';
 import { PageHeader } from '../../shared/page-header';
 
@@ -14,6 +15,11 @@ import { PageHeader } from '../../shared/page-header';
   selector: 'app-item-form',
   imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: `
+    .photo { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .photo img { width: 72px; height: 72px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+    .photo label { cursor: pointer; }
+  `,
   template: `
     <app-page-header [title]="id() ? 'Edit item' : 'New item'" />
     <form class="card" [formGroup]="form" (ngSubmit)="save()" novalidate>
@@ -65,6 +71,20 @@ import { PageHeader } from '../../shared/page-header';
               </select>
             </div>
             <div class="field span-all"><label for="desc">Description</label><textarea id="desc" class="textarea" formControlName="description"></textarea></div>
+            <div class="field span-all">
+              <span class="label">Product photo</span>
+              <div class="photo">
+                @if (form.controls.image.value; as src) {
+                  <img [src]="src" alt="Product photo" />
+                  <label class="btn btn--outline btn--sm">Change<input type="file" accept="image/*" hidden (change)="pickPhoto($event)" /></label>
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="form.controls.image.setValue(null)">Remove</button>
+                } @else {
+                  <label class="btn btn--outline btn--sm">Upload photo<input type="file" accept="image/*" hidden (change)="pickPhoto($event)" /></label>
+                }
+              </div>
+              <small class="muted">Copied onto estimates (and other documents you choose in Settings → Features) when you pick this item.</small>
+              <app-field-error [server]="errors()['image']" />
+            </div>
           </div>
         </div>
         @if (type() === 'goods') {
@@ -118,7 +138,20 @@ export class ItemForm implements OnInit {
     opening_stock: [0],
     reorder_level: [0],
     is_active: [true],
+    image: [null as string | null],
   });
+
+  async pickPhoto(e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      this.form.controls.image.setValue(await resizeImage(file, 600, 600, 300_000));
+    } catch (err) {
+      this.toast.error((err as Error).message);
+    }
+  }
   protected readonly type = toSignal(this.form.controls.type.valueChanges, { initialValue: this.form.controls.type.value });
 
   ngOnInit(): void {

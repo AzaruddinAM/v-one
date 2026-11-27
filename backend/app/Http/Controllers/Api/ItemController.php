@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentItem;
 use App\Models\Item;
+use App\Models\Organization;
 use App\Models\StockMovement;
 use App\Services\StockService;
 use App\Support\Tenant;
@@ -30,6 +31,7 @@ class ItemController extends Controller
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
             'opening_stock' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['boolean'],
+            'image' => Organization::lineImageRule(),
         ];
     }
 
@@ -73,12 +75,12 @@ class ItemController extends Controller
             $stock->adjust($item, $opening, today()->toDateString(), 'Opening stock');
         }
 
-        return response()->json($item->fresh('tax'), 201);
+        return response()->json($item->fresh('tax')->makeVisible('image'), 201);
     }
 
     public function show(Item $item)
     {
-        return $item->load('tax');
+        return $item->load('tax')->makeVisible('image');
     }
 
     public function update(Request $request, Item $item)
@@ -90,7 +92,7 @@ class ItemController extends Controller
         }
         $item->update($data);
 
-        return $item->fresh('tax');
+        return $item->fresh('tax')->makeVisible('image');
     }
 
     public function destroy(Item $item)
