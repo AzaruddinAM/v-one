@@ -78,8 +78,15 @@ class Organization extends Model
 
     protected function casts(): array
     {
-        return ['fiscal_year_start' => 'integer', 'pdf_options' => 'array', 'number_series' => 'array', 'preferences' => 'array', 'lock_date' => 'date:Y-m-d'];
+        return [
+            'fiscal_year_start' => 'integer', 'pdf_options' => 'array', 'number_series' => 'array', 'preferences' => 'array',
+            'lock_date' => 'date:Y-m-d',
+            // SMTP details incl. password: encrypted with APP_KEY, never serialized (see OrgMailer::publicSettings).
+            'mail_settings' => 'encrypted:array',
+        ];
     }
+
+    protected $hidden = ['mail_settings'];
 
     public function users(): HasMany
     {

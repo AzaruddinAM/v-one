@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, input, OnInit, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
@@ -17,10 +17,11 @@ import { StatusBadge } from '../../shared/status-badge';
 import { PaymentDialog } from '../payments/payment-dialog';
 import { DocumentSheet } from './document-sheet';
 import { RetainerPanel } from './retainer-panel';
+import { DocumentEmailLog, EmailDialog } from './email-dialog';
 
 @Component({
   selector: 'app-document-view',
-  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog, DocumentSheet, RetainerPanel],
+  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog, DocumentSheet, RetainerPanel, EmailDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-view.scss',
   template: `
@@ -57,6 +58,9 @@ import { RetainerPanel } from './retainer-panel';
             @for (t of templates(); track t.id) { <option [value]="t.id">{{ t.label }}</option> }
           </select>
         </label>
+        @if (d.status !== 'void') {
+          <button type="button" class="btn btn--outline btn--sm" (click)="emailing.set(true)" title="Email it with the PDF attached"><app-icon name="mail" [size]="16" /> Email</button>
+        }
         <button type="button" class="btn btn--outline btn--sm" (click)="print()" title="Print or save as PDF"><app-icon name="print" [size]="16" /> PDF / Print</button>
         <div class="more">
           <button type="button" class="btn btn--outline btn--sm btn--icon" (click)="menu.set(!menu())" aria-label="More"><app-icon name="chevron-down" [size]="16" /></button>
@@ -120,6 +124,31 @@ import { RetainerPanel } from './retainer-panel';
         </div>
       }
 
+      @if (emails().length) {
+        <div class="card mt-2 no-print">
+          <div class="card__header"><h2>Emails sent</h2></div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Sent</th><th>To</th><th>Subject</th><th>By</th></tr></thead>
+              <tbody>
+                @for (m of emails(); track m.id) {
+                  <tr>
+                    <td class="nowrap">{{ m.created_at | date: 'dd MMM yyyy, h:mm a' }}</td>
+                    <td>{{ m.to }}@if (m.cc) { <span class="sub">CC {{ m.cc }}</span> }</td>
+                    <td>{{ m.subject }}@if (m.with_pdf) { <span class="sub">PDF attached</span> }</td>
+                    <td>{{ m.sender?.name || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (emailing()) {
+        <app-email-dialog [doc]="d" [sheet]="sheetEl()" [paper]="opts().paper" (closed)="emailing.set(false)" (sent)="onEmailed($event)" />
+      }
+
       @if (paying()) {
         <app-payment-dialog [direction]="d.type === 'bill' ? 'out' : 'in'" [document]="d" (closed)="paying.set(false)" (saved)="paying.set(false); load()" />
       }
@@ -142,6 +171,9 @@ export class DocumentView implements OnInit {
   protected readonly doc = signal<Document | null>(null);
   protected readonly paying = signal(false);
   protected readonly menu = signal(false);
+  protected readonly emailing = signal(false);
+  protected readonly emails = signal<DocumentEmailLog[]>([]);
+  private readonly sheetRef = viewChild(DocumentSheet, { read: ElementRef });
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
   protected readonly org = this.auth.organization;
   protected readonly link = docPath;
@@ -164,12 +196,27 @@ export class DocumentView implements OnInit {
 
   load(): void {
     this.api.get<Document>(`documents/${this.id()}`).subscribe({
-      next: (d) => this.doc.set(d),
+      next: (d) => {
+        this.doc.set(d);
+        this.api.get<DocumentEmailLog[]>(`documents/${d.id}/emails`).subscribe({ next: (e) => this.emails.set(e), error: () => this.emails.set([]) });
+      },
       error: (e) => {
         this.toast.error(errorMessage(e));
         void this.router.navigateByUrl(this.cfg().path);
       },
     });
+  }
+
+  /** The printable sheet element, for the PDF attached to emails. */
+  protected sheetEl(): HTMLElement | null {
+    return (this.sheetRef()?.nativeElement as HTMLElement | undefined)?.querySelector<HTMLElement>('.sheet') ?? null;
+  }
+
+  protected onEmailed(r: { email: DocumentEmailLog; status: string }): void {
+    this.emailing.set(false);
+    this.emails.update((list) => [r.email, ...list]);
+    const d = this.doc();
+    if (d && r.status !== d.status) this.load();
   }
 
   setStatus(status: string): void {

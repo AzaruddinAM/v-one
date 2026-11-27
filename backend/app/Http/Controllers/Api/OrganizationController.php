@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\Organization;
+use App\Mail\DocumentMail;
 use App\Services\OrganizationSetup;
+use App\Services\OrgMailer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
@@ -114,6 +116,53 @@ class OrganizationController extends Controller
         $org->update(['preferences' => array_merge($org->preferences ?? [], $data)]);
 
         return $org->fresh();
+    }
+
+    /** Settings → Email: how documents are emailed. The SMTP password is never sent back. */
+    public function mail(Request $request)
+    {
+        $settings = OrgMailer::publicSettings($request->user()->organization);
+
+        // Everyone needs the message templates to send; only admins see the server details.
+        return $request->user()->role === 'admin'
+            ? $settings
+            : Arr::only($settings, ['mode', 'subject_template', 'body_template', 'ready', 'server_ready']);
+    }
+
+    public function updateMail(Request $request)
+    {
+        abort_unless(Schema::hasColumn('organizations', 'mail_settings'), 422, 'Run the database upgrade first (php artisan migrate).');
+        $org = $request->user()->organization;
+        $data = $request->validate(OrgMailer::rules());
+        $current = OrgMailer::settings($org);
+        // An empty password box keeps the saved password; switching host clears it.
+        if (($data['password'] ?? '') === '' && ($data['host'] ?? '') === ($current['host'] ?? '')) {
+            $data['password'] = $current['password'] ?? null;
+        }
+        $org->forceFill(['mail_settings' => $data])->save();
+
+        return OrgMailer::publicSettings($org->fresh());
+    }
+
+    /** Sends a short test message to the signed-in user (never to a customer). */
+    public function testMail(Request $request)
+    {
+        $org = $request->user()->organization;
+        abort_unless(OrgMailer::ready($org), 422, 'Email is not set up yet. Enter your SMTP details and save first.');
+        abort_unless((bool) $request->user()->email, 422, 'Add an email address to your profile first: the test is sent to you.');
+        try {
+            OrgMailer::mailer($org)->to($request->user()->email)->send(new DocumentMail(
+                'Test email from '.$org->name,
+                "This is a test from VelouraOne.\n\nIf you can read this, emailing invoices and estimates to your customers will work.",
+                OrgMailer::from($org),
+                OrgMailer::replyTo($org),
+            ));
+        } catch (\Throwable $e) {
+            report($e);
+            abort(422, 'Could not send: '.OrgMailer::explain($e));
+        }
+
+        return ['sent_to' => $request->user()->email];
     }
 
     /** Transactions dated on or before the lock date cannot be created, edited or deleted. */

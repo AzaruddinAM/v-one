@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankingController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\DocumentEmailController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\JournalController;
@@ -38,6 +39,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::put('/organization', [OrganizationController::class, 'update'])->middleware('role:admin');
     Route::put('/organization/lock-date', [OrganizationController::class, 'lockDate'])->middleware('role:admin');
     Route::put('/organization/preferences', [OrganizationController::class, 'preferences'])->middleware('role:admin');
+    Route::get('/organization/mail', [OrganizationController::class, 'mail']); // templates + ready flag for the compose window
+    Route::put('/organization/mail', [OrganizationController::class, 'updateMail'])->middleware('role:admin');
+    Route::post('/organization/mail/test', [OrganizationController::class, 'testMail'])->middleware(['role:admin', 'throttle:mail']);
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/users', [UserController::class, 'index']);
@@ -62,6 +66,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('documents/next-number', [DocumentController::class, 'nextNumber']);
     Route::get('documents/overdue', [DocumentController::class, 'overdue']);
     Route::post('documents/{document}/reminded', [DocumentController::class, 'reminded']);
+    Route::get('documents/{document}/emails', [DocumentEmailController::class, 'index']);
+    Route::post('documents/{document}/email', [DocumentEmailController::class, 'send'])->middleware('throttle:mail');
 
     Route::post('recurring-profiles/run', [RecurringProfileController::class, 'run']);
     Route::post('recurring-profiles/{recurring_profile}/status', [RecurringProfileController::class, 'status']);

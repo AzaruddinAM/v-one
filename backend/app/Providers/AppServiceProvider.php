@@ -30,5 +30,10 @@ class AppServiceProvider extends ServiceProvider
             Limit::perDay((int) config('services.gemini.per_day', 500))->by('ai-org|'.($r->user()?->organization_id ?: $r->ip())),
         ]);
         RateLimiter::for('register', fn (Request $r) => Limit::perHour(10)->by($r->ip()));
+        // Send by email: keeps a mistake (or a leaked token) from turning into a spam run.
+        RateLimiter::for('mail', fn (Request $r) => [
+            Limit::perMinute(10)->by('mail|'.($r->user()?->id ?: $r->ip())),
+            Limit::perDay(300)->by('mail-org|'.($r->user()?->organization_id ?: $r->ip())),
+        ]);
     }
 }
