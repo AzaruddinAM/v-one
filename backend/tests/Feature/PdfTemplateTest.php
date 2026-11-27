@@ -111,7 +111,7 @@ class PdfTemplateTest extends TestCase
     {
         $this->signIn();
 
-        foreach (['standard', 'elegant', 'bold', 'corporate', 'creative', 'bilingual'] as $template) {
+        foreach (['standard', 'elegant', 'bold', 'corporate', 'creative', 'wave', 'geometric', 'gradient', 'splash', 'bilingual'] as $template) {
             $this->putJson('/api/organization', $this->payload(['pdf_template' => $template]))->assertOk()
                 ->assertJsonPath('pdf_template', $template);
         }

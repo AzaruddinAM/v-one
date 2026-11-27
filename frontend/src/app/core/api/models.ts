@@ -40,7 +40,7 @@ export interface NumberSeries {
   digits: number;
 }
 
-export type PdfTemplateId = 'classic' | 'modern' | 'minimal' | 'gst' | 'standard' | 'elegant' | 'bold' | 'corporate' | 'creative' | 'bilingual';
+export type PdfTemplateId = 'classic' | 'modern' | 'minimal' | 'gst' | 'standard' | 'elegant' | 'bold' | 'corporate' | 'creative' | 'wave' | 'geometric' | 'gradient' | 'splash' | 'bilingual';
 
 /** Extra customisation for printed / PDF documents, stored as JSON on the organization. */
 export interface PdfOptions {

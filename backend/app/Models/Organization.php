@@ -11,7 +11,7 @@ class Organization extends Model
     use HasFactory;
 
     /** Layouts available for printed / PDF documents (rendered by the frontend). */
-    public const PDF_TEMPLATES = ['classic', 'modern', 'minimal', 'gst', 'standard', 'elegant', 'bold', 'corporate', 'creative', 'bilingual'];
+    public const PDF_TEMPLATES = ['classic', 'modern', 'minimal', 'gst', 'standard', 'elegant', 'bold', 'corporate', 'creative', 'wave', 'geometric', 'gradient', 'splash', 'bilingual'];
 
     /** Images are stored as data URLs (resized in the browser), so keep them small. */
     public const PDF_IMAGE_MAX = 500_000;

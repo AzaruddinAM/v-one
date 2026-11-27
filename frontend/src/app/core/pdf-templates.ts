@@ -19,6 +19,10 @@ export const PDF_TEMPLATES: readonly PdfTemplate[] = [
   { id: 'bold', label: 'Bold', description: 'Oversized title, black table header and a solid colour total bar.' },
   { id: 'corporate', label: 'Corporate', description: 'Colour side stripe, info cards for customer and details, boxed total.' },
   { id: 'creative', label: 'Creative', description: 'Curved colour corner, rounded cards and pill headings. Stands out.' },
+  { id: 'wave', label: 'Wave', description: 'Colour header with a soft layered curve and a rounded total.' },
+  { id: 'geometric', label: 'Geometric', description: 'Slanted colour header, angled total bar and diamond markers.' },
+  { id: 'gradient', label: 'Gradient', description: 'Rounded gradient header card with soft floating panels.' },
+  { id: 'splash', label: 'Splash', description: 'Playful colour blobs, dotted corner and dashed cards.' },
   { id: 'bilingual', label: 'UAE Bilingual', description: 'English and Arabic labels, as UAE tax invoices usually show.', regimes: ['vat'] },
 ];
 

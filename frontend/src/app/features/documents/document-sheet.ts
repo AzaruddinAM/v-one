@@ -13,7 +13,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
   selector: 'app-document-sheet',
   imports: [DatePipe, MoneyPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styleUrl: './document-sheet.scss',
+  styleUrls: ['./document-sheet.scss', './document-sheet-designs.scss'],
   template: `
     @let d = doc();
     @let o = options();
