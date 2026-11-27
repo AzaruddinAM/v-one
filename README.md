@@ -23,11 +23,15 @@ v-one/
 | **Dashboard** | Receivables / payables with overdue, monthly sales & expenses, 12-month chart, top customers, recent transactions, low-stock alerts |
 | **Contacts** | Customers & vendors, GSTIN/PAN, addresses, payment terms, opening balance, outstanding balance, transactions + account statement |
 | **Items** | Goods & services, SKU, HSN/SAC, units, categories, sales & cost price, default tax, inventory tracking, opening stock, reorder level, stock adjustments |
-| **Sales** | Estimates → Sales Orders → Invoices, Credit Notes; auto numbering (INV-00001…), line discounts, document discount, adjustment, live totals, print/PDF-ready tax invoice with CGST/SGST split |
-| **Purchases** | Purchase Orders → Bills, Payments Made, Expenses with tax |
+| **Sales** | Estimates → Sales Orders → Delivery Challans → Invoices, Credit Notes; auto numbering (INV-00001…) or custom series, line discounts, document discount, adjustment, live totals, print/PDF-ready tax invoice with CGST/SGST split |
+| **Purchases** | Purchase Orders → Bills, Vendor Credits (purchase returns), Payments Made, Expenses with tax |
+| **Tax system** | Settings → Organization → *Tax system*: **India GST** (GSTIN, CGST/SGST split, GST summary) or **UAE VAT** (TRN, VAT 5% / zero-rated / exempt rates, TAX INVOICE, AED amounts in words, **VAT Return (VAT 201)** report) or plain sales tax |
+| **Transaction numbers** | Settings → Transaction numbers: per-document prefix with `{YYYY}` `{YY}` `{MM}` `{FY}` `{CODE}` placeholders (e.g. `INV-{YY}-{CODE}-` → INV-26-TU-2630), next number and digits; one running number per type; continues after hand-typed / imported numbers |
+| **Recurring** | Recurring Invoices and Recurring Bills: weekly / monthly / yearly (every N), start & end date, created as draft or sent, pause / resume, catch-up of missed runs. Runs daily via `php artisan billing:daily` (scheduler) **and** once a day when anyone opens the app, so no cron is needed on hPanel |
+| **Payment terms & reminders** | Zoho payment terms (Due on receipt, Net 7–90, end of month, end of next month) set the due date and print on the PDF; overdue statuses refresh daily; **Payment Reminders** page groups overdue invoices by customer with one-click Email / WhatsApp / Copy and a reminder log; editable message template |
 | **PDF templates** | Settings → PDF templates with a live preview: Classic, Modern, Minimal or GST Tax Invoice layout; accent colour, font, text size and paper (A4 / Letter / A5); logo upload (left / centre / right, 3 sizes); tagline and custom titles (e.g. QUOTATION); show/hide address, GSTIN, phone, email, item descriptions, discount & tax columns, amount in words, notes, terms, balance, PAID stamp; footer text (bank / UPI), bottom line, signature box with uploaded signature or stamp. Switch template per document from its toolbar, then **PDF / Print → Save as PDF** |
 | **Payments** | Record full/partial payments (cash, bank, UPI, cheque, card) against invoices/bills or as advances; statuses update automatically (sent → partial → paid / overdue) |
-| **Inventory** | Stock moves automatically: invoices reduce, bills & credit notes increase; draft/void documents don't touch stock; edits re-sync |
+| **Inventory** | Stock moves automatically: invoices & vendor credits reduce, bills & credit notes increase (delivery challans don't move stock); draft/void documents don't touch stock; edits re-sync |
 | **Accountant** | Chart of accounts (25 standard accounts pre-created), manual journals with debit = credit validation |
 | **Reports** | Profit & Loss, Balance Sheet, Receivables & Payables aging, Sales by Customer, Sales by Item, GST/Tax summary, Inventory valuation — date presets, CSV export, print |
 | **Settings** | Organization profile, currency, financial year, default terms; tax rates; users & roles (admin / accountant / staff); profile & password |
@@ -78,7 +82,7 @@ GEMINI_API_KEY=your-gemini-key     # optional: enables bill scanning + AI chat
 ```
 A unique `APP_KEY` is already filled in.
 
-> **Upgrading an existing database?** Run `database/upgrade-*.sql` files you haven't run yet in phpMyAdmin → SQL (e.g. `upgrade-2026-11-pdf-templates.sql` adds the PDF template columns).
+> **Upgrading an existing database?** Run `database/upgrade-*.sql` files you haven't run yet in phpMyAdmin → SQL (e.g. `upgrade-2026-11-pdf-templates.sql` adds the PDF template columns, then `upgrade-2026-11-billing-features.sql` adds the tax system, number series, recurring profiles and reminder columns).
 
 **5. PHP version** — hPanel → *Advanced → PHP Configuration* → **PHP 8.3 or newer** (extensions `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `bcmath` are enabled by default on Hostinger).
 

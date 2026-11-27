@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } 
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { Document, Organization, PdfOptions, PdfTemplateId } from '../../core/api/models';
+import { taxProfile } from '../../core/tax-regime';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DEFAULT_PDF_OPTIONS, orgPdfAccent, orgPdfOptions, orgPdfTemplate, PDF_ACCENTS, PDF_TEMPLATES } from '../../core/pdf-templates';
 import { ToastService } from '../../core/ui/toast.service';
@@ -242,10 +243,10 @@ export class PdfSettings implements OnInit {
   protected readonly headerFlags: [Flag, string][] = [
     ['show_org_name', 'Business name'],
     ['show_org_address', 'Address'],
-    ['show_org_gstin', 'GSTIN'],
+    ['show_org_gstin', taxProfile(this.auth.organization()).idLabel],
     ['show_org_phone', 'Phone'],
     ['show_org_email', 'Email'],
-    ['show_customer_gstin', "Customer's GSTIN"],
+    ['show_customer_gstin', `Customer's ${taxProfile(this.auth.organization()).idLabel}`],
   ];
   protected readonly bodyFlags: [Flag, string][] = [
     ['show_item_description', 'Item descriptions'],

@@ -8,15 +8,17 @@ export function formatMoney(value: number | string | null | undefined, currency 
   const key = `${currency}|${withSymbol}`;
   let f = formatters.get(key);
   if (!f) {
+    // Indian digit grouping (1,23,456.00) only for rupees; everyone else groups by thousands.
+    const locale = currency === 'INR' ? 'en-IN' : 'en-US';
     f = withSymbol
-      ? new Intl.NumberFormat('en-IN', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      ? new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     formatters.set(key, f);
   }
   return f.format(n);
 }
 
-/** Formats amounts in the organization's currency with Indian digit grouping (₹1,23,456.00). */
+/** Formats amounts in the organization's currency (₹1,23,456.00 for INR, AED 123,456.00 for AED). */
 @Pipe({ name: 'money' })
 export class MoneyPipe implements PipeTransform {
   private readonly auth = inject(AuthStore, { optional: true });

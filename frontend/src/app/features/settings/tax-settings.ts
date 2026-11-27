@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { Tax } from '../../core/api/models';
 import { AuthStore } from '../../core/auth/auth.store';
+import { taxProfile } from '../../core/tax-regime';
 import { LookupsStore } from '../../core/state/lookups.store';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { ToastService } from '../../core/ui/toast.service';
@@ -16,7 +17,7 @@ import { Icon } from '../../shared/icon';
   template: `
     <div class="card">
       <div class="card__header">
-        <div><h2>Tax rates</h2><p class="muted">GST, VAT or any sales tax applied on items and transactions.</p></div>
+        <div><h2>Tax rates</h2><p class="muted">GST, VAT or any sales tax applied on items and transactions. For UAE VAT use type <strong>VAT</strong> for 5% and zero-rated, and <strong>EXEMPT</strong> for exempt supplies (VAT return box 5).</p></div>
       </div>
       <table class="table">
         <thead><tr><th>Name</th><th style="width:140px">Rate (%)</th><th style="width:140px">Type</th><th style="width:100px">Active</th><th></th></tr></thead>
@@ -25,7 +26,7 @@ import { Icon } from '../../shared/icon';
             <tr>
               <td><input class="input input--sm" [(ngModel)]="t.name" [disabled]="!auth.canDelete()" /></td>
               <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="t.rate" [disabled]="!auth.canDelete()" /></td>
-              <td><input class="input input--sm" [(ngModel)]="t.type" [disabled]="!auth.canDelete()" /></td>
+              <td><input class="input input--sm" list="tax-types" [(ngModel)]="t.type" [disabled]="!auth.canDelete()" /></td>
               <td><input type="checkbox" [(ngModel)]="t.is_active" [disabled]="!auth.canDelete()" /></td>
               <td class="actions">
                 @if (auth.canDelete()) {
@@ -39,13 +40,14 @@ import { Icon } from '../../shared/icon';
             <tr>
               <td><input class="input input--sm" placeholder="e.g. IGST 18%" [(ngModel)]="draft.name" /></td>
               <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="draft.rate" /></td>
-              <td><input class="input input--sm" [(ngModel)]="draft.type" /></td>
+              <td><input class="input input--sm" list="tax-types" [(ngModel)]="draft.type" /></td>
               <td></td>
               <td class="actions"><button type="button" class="btn btn--sm" (click)="add()" [disabled]="!draft.name"><app-icon name="plus" [size]="16" /> Add</button></td>
             </tr>
           }
         </tbody>
       </table>
+      <datalist id="tax-types"><option value="GST"></option><option value="VAT"></option><option value="EXEMPT"></option><option value="TAX"></option></datalist>
     </div>
   `,
 })
@@ -56,7 +58,11 @@ export class TaxSettings implements OnInit {
   private readonly lookups = inject(LookupsStore);
   protected readonly auth = inject(AuthStore);
   protected readonly taxes = signal<Tax[]>([]);
-  protected draft: Partial<Tax> = { name: '', rate: 0, type: 'GST' };
+  protected draft: Partial<Tax> = { name: '', rate: 0, type: this.defaultType() };
+
+  private defaultType(): string {
+    return taxProfile(this.auth.organization()).tax.toUpperCase();
+  }
 
   ngOnInit(): void {
     this.load();
@@ -75,7 +81,7 @@ export class TaxSettings implements OnInit {
   add(): void {
     this.api.post<Tax>('taxes', { ...this.draft, is_active: true }).subscribe({
       next: () => {
-        this.draft = { name: '', rate: 0, type: 'GST' };
+        this.draft = { name: '', rate: 0, type: this.defaultType() };
         this.done('Tax added');
       },
       error: (e) => this.toast.error(errorMessage(e)),

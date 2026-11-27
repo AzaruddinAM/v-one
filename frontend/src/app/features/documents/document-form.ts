@@ -4,7 +4,9 @@ import { FormArray, FormGroup, NonNullableFormBuilder, ReactiveFormsModule, Vali
 import { Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { Contact, Document, DocumentType, Item } from '../../core/api/models';
+import { Contact, Document, DocumentType, Item, RecurringFrequency, RecurringProfile } from '../../core/api/models';
+import { taxProfile } from '../../core/tax-regime';
+import { dueDateFor, PAYMENT_TERMS, termsForDays } from '../../core/utils/payment-terms';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG } from '../../core/documents.config';
 import { LookupsStore } from '../../core/state/lookups.store';
@@ -21,6 +23,8 @@ import { Typeahead } from '../../shared/typeahead';
 const SEND_STATUS: Record<DocumentType, string> = {
   estimate: 'sent',
   sales_order: 'open',
+  delivery_challan: 'open',
+  vendor_credit: 'open',
   invoice: 'sent',
   credit_note: 'open',
   purchase_order: 'open',
@@ -33,9 +37,50 @@ const SEND_STATUS: Record<DocumentType, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-form.scss',
   template: `
-    <app-page-header [title]="(id() ? 'Edit ' : 'New ') + cfg().label" [subtitle]="id() ? number() : ''" />
+    <app-page-header [title]="(id() ? 'Edit ' : 'New ') + (recurring() ? 'Recurring ' : '') + cfg().label" [subtitle]="id() && !recurring() ? number() : ''" />
 
     <form [formGroup]="form" (ngSubmit)="save(sendStatus())" novalidate>
+      @if (recurring()) {
+        <div class="card" style="margin-bottom:16px" [formGroup]="schedule">
+          <div class="card__header"><h2><app-icon name="repeat" [size]="18" /> Schedule</h2></div>
+          <div class="card__body">
+            <div class="form-grid">
+              <div class="field span-2">
+                <label class="req" for="rp-name">Profile name</label>
+                <input id="rp-name" class="input" formControlName="name" placeholder="e.g. Monthly maintenance" />
+                <app-field-error [control]="schedule.controls.name" label="Profile name" [server]="errors()['name']" />
+              </div>
+              <div class="field">
+                <label for="rp-every">Repeat every</label>
+                <div class="gap">
+                  <input id="rp-every" class="input" type="number" min="1" max="36" style="width:80px" formControlName="interval" />
+                  <select class="select" formControlName="frequency" aria-label="Frequency">
+                    <option value="week">week(s)</option>
+                    <option value="month">month(s)</option>
+                    <option value="year">year(s)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label class="req" for="rp-start">Starts on</label>
+                <input id="rp-start" class="input" type="date" formControlName="start_date" />
+                <app-field-error [server]="errors()['start_date']" />
+              </div>
+              <div class="field">
+                <label for="rp-end">Ends on</label>
+                <input id="rp-end" class="input" type="date" formControlName="end_date" />
+                <small class="muted">Leave empty to never end.</small>
+                <app-field-error [server]="errors()['end_date']" />
+              </div>
+              <label class="checkbox span-2" style="align-self:center">
+                <input type="checkbox" formControlName="auto_send" />
+                Create as {{ sendStatus() === 'sent' ? 'sent' : 'open' }} (otherwise each {{ cfg().label.toLowerCase() }} is created as a draft for you to review)
+              </label>
+            </div>
+            @if (id() && nextRun()) { <p class="muted small" style="margin:12px 0 0">Next {{ cfg().label.toLowerCase() }} will be created on {{ nextRun() }}.</p> }
+          </div>
+        </div>
+      }
       <div class="card">
         <div class="card__body">
           <div class="form-grid head">
@@ -52,24 +97,39 @@ const SEND_STATUS: Record<DocumentType, string> = {
               />
               <app-field-error [control]="form.controls.contact_id" label="Contact" [server]="errors()['contact_id']" />
               @if (contact(); as c) {
-                <small class="muted">{{ c.billing_address || c.city }} {{ c.gstin ? '· GSTIN ' + c.gstin : '' }}</small>
+                <small class="muted">{{ c.billing_address || c.city }} {{ c.gstin ? '· ' + tax.idLabel + ' ' + c.gstin : '' }}</small>
               }
             </div>
-            <div class="field">
-              <label for="number">{{ cfg().label }} #</label>
-              <input id="number" class="input" formControlName="number" [placeholder]="nextNumber()" />
-              <app-field-error [server]="errors()['number']" />
-            </div>
+            @if (!recurring()) {
+              <div class="field">
+                <label for="number">{{ cfg().label }} #</label>
+                <input id="number" class="input" formControlName="number" [placeholder]="nextNumber()" (input)="numberTyped = true" />
+                <app-field-error [server]="errors()['number']" />
+              </div>
+            }
             <div class="field"><label for="ref">Reference</label><input id="ref" class="input" formControlName="reference" /></div>
-            <div class="field">
-              <label class="req" for="date">Date</label>
-              <input id="date" class="input" type="date" formControlName="date" />
-            </div>
-            <div class="field">
-              <label for="due">{{ cfg().dueLabel }}</label>
-              <input id="due" class="input" type="date" formControlName="due_date" />
-              <app-field-error [server]="errors()['due_date']" />
-            </div>
+            @if (!recurring()) {
+              <div class="field">
+                <label class="req" for="date">Date</label>
+                <input id="date" class="input" type="date" formControlName="date" (change)="onDateChange()" />
+              </div>
+            }
+            @if (cfg().payable) {
+              <div class="field">
+                <label for="pterms">Payment terms</label>
+                <select id="pterms" class="select" formControlName="payment_terms" (change)="applyTerms()">
+                  <option value="">Custom</option>
+                  @for (t of paymentTerms; track t.label) { <option [value]="t.label">{{ t.label }}</option> }
+                </select>
+              </div>
+            }
+            @if (!recurring()) {
+              <div class="field">
+                <label for="due">{{ cfg().dueLabel }}</label>
+                <input id="due" class="input" type="date" formControlName="due_date" (change)="form.controls.payment_terms.setValue('')" />
+                <app-field-error [server]="errors()['due_date']" />
+              </div>
+            }
           </div>
         </div>
 
@@ -146,13 +206,20 @@ const SEND_STATUS: Record<DocumentType, string> = {
       </div>
 
       <div class="actions-bar">
-        <a [routerLink]="cfg().path" class="btn btn--outline">Cancel</a>
+        <a [routerLink]="backLink()" class="btn btn--outline">Cancel</a>
         <span class="spacer"></span>
-        <button type="button" class="btn btn--outline" (click)="save('draft')" [disabled]="saving()">Save as draft</button>
-        <button type="submit" class="btn" [disabled]="saving()">
-          @if (saving()) { <span class="spinner"></span> }
-          {{ id() && currentStatus() !== 'draft' ? 'Save changes' : 'Save & ' + (sendStatus() === 'sent' ? 'send' : 'open') }}
-        </button>
+        @if (recurring()) {
+          <button type="submit" class="btn" [disabled]="saving()">
+            @if (saving()) { <span class="spinner"></span> }
+            {{ id() ? 'Save profile' : 'Start recurring ' + cfg().label.toLowerCase() }}
+          </button>
+        } @else {
+          <button type="button" class="btn btn--outline" (click)="save('draft')" [disabled]="saving()">Save as draft</button>
+          <button type="submit" class="btn" [disabled]="saving()">
+            @if (saving()) { <span class="spinner"></span> }
+            {{ id() && currentStatus() !== 'draft' ? 'Save changes' : 'Save & ' + (sendStatus() === 'sent' ? 'send' : 'open') }}
+          </button>
+        }
       </div>
     </form>
   `,
@@ -169,6 +236,8 @@ export class DocumentForm implements OnInit {
   readonly id = input<string>();
   /** ?contact=ID preselects a contact (from the contact page). */
   readonly contactParam = input<string>(undefined, { alias: 'contact' });
+  /** Route data: edit a recurring profile (schedule + template) instead of a document. */
+  readonly recurring = input(false);
 
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
   protected readonly sendStatus = computed(() => SEND_STATUS[this.docType()]);
@@ -179,6 +248,23 @@ export class DocumentForm implements OnInit {
   protected readonly number = signal('');
   protected readonly currentStatus = signal('draft');
   protected contactText = signal('');
+  protected readonly tax = taxProfile(inject(AuthStore).organization());
+  protected readonly paymentTerms = PAYMENT_TERMS;
+  protected readonly nextRun = signal('');
+  /** The user typed a number: stop replacing it with the series preview. */
+  protected numberTyped = false;
+  protected readonly backLink = computed(() =>
+    this.recurring() ? (this.docType() === 'bill' ? '/purchases/recurring-bills' : '/sales/recurring-invoices') : this.cfg().path,
+  );
+
+  protected readonly schedule = this.fb.group({
+    name: ['', Validators.required],
+    frequency: ['month' as RecurringFrequency],
+    interval: [1, [Validators.required, Validators.min(1)]],
+    start_date: [isoDate(), Validators.required],
+    end_date: [''],
+    auto_send: [false],
+  });
 
   protected readonly form = this.fb.group({
     contact_id: [null as number | null, Validators.required],
@@ -186,6 +272,7 @@ export class DocumentForm implements OnInit {
     reference: [''],
     date: [isoDate(), Validators.required],
     due_date: [''],
+    payment_terms: [''],
     discount: [0],
     adjustment: [0],
     notes: [''],
@@ -224,11 +311,13 @@ export class DocumentForm implements OnInit {
   ngOnInit(): void {
     const org = this.auth.organization();
     const id = this.id();
-    if (id) {
+    if (id && this.recurring()) {
+      this.api.get<RecurringProfile>(`recurring-profiles/${id}`).subscribe((p) => this.patchProfile(p));
+    } else if (id) {
       this.api.get<Document>(`documents/${id}`).subscribe((d) => this.patch(d));
     } else {
       this.form.patchValue({ terms: this.cfg().contactType === 'customer' ? (org?.invoice_terms ?? '') : '', notes: this.cfg().contactType === 'customer' ? (org?.invoice_notes ?? '') : '' });
-      this.api.get<{ number: string }>('documents/next-number', { type: this.docType() }).subscribe((r) => this.nextNumber.set(r.number));
+      this.refreshNumber();
       const pre = this.contactParam();
       if (pre) this.api.get<Contact>(`contacts/${pre}`).subscribe((c) => this.pickContact(c));
     }
@@ -269,8 +358,62 @@ export class DocumentForm implements OnInit {
     this.contact.set(c);
     this.contactText.set(c.name);
     this.form.controls.contact_id.setValue(c.id);
+    if (this.cfg().payable) {
+      this.form.controls.payment_terms.setValue(termsForDays(c.payment_terms ?? 30));
+    }
     if (this.cfg().payable || !this.form.controls.due_date.value) {
       this.form.controls.due_date.setValue(addDays(this.form.controls.date.value, c.payment_terms ?? 30));
+    }
+    this.applyTerms();
+    this.refreshNumber();
+  }
+
+  /** Preview of the next number; with a custom series it depends on the customer ({CODE}) and date. */
+  private refreshNumber(): void {
+    if (this.id() || this.recurring()) return;
+    const v = this.form.getRawValue();
+    this.api
+      .get<{ number: string }>('documents/next-number', { type: this.docType(), ...(v.contact_id ? { contact_id: v.contact_id } : {}), date: v.date })
+      .subscribe((r) => this.nextNumber.set(r.number));
+  }
+
+  protected onDateChange(): void {
+    this.applyTerms();
+    if (!this.numberTyped) this.refreshNumber();
+  }
+
+  /** Payment terms → due date (Custom leaves the date as typed). */
+  protected applyTerms(): void {
+    const due = dueDateFor(this.form.controls.payment_terms.value, this.form.controls.date.value);
+    if (due) this.form.controls.due_date.setValue(due);
+  }
+
+  private patchProfile(p: RecurringProfile): void {
+    this.nextRun.set(p.status === 'active' ? new Date(p.next_date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
+    this.schedule.patchValue({
+      name: p.name,
+      frequency: p.frequency,
+      interval: p.interval,
+      start_date: p.start_date,
+      end_date: p.end_date ?? '',
+      auto_send: p.auto_send,
+    });
+    const t = p.template;
+    this.lines.clear();
+    (t.items ?? []).forEach((l) => this.lines.push(this.newLine({ ...l, discount_percent: l.discount_percent ?? 0 })));
+    if (!this.lines.length) this.addLine();
+    this.form.patchValue({
+      contact_id: p.contact_id,
+      reference: t.reference ?? '',
+      payment_terms: p.payment_terms ?? '',
+      discount: t.discount ?? 0,
+      adjustment: t.adjustment ?? 0,
+      notes: t.notes ?? '',
+      terms: t.terms ?? '',
+    });
+    if (p.contact) {
+      this.contact.set(p.contact);
+      this.contactText.set(p.contact.name);
     }
   }
 
@@ -286,6 +429,7 @@ export class DocumentForm implements OnInit {
       reference: d.reference ?? '',
       date: d.date,
       due_date: d.due_date ?? '',
+      payment_terms: d.payment_terms ?? '',
       discount: d.discount,
       adjustment: d.adjustment,
       notes: d.notes ?? '',
@@ -303,8 +447,9 @@ export class DocumentForm implements OnInit {
       const l = this.lines.at(i).getRawValue();
       if (!l.name && !l.item_id && !l.rate) this.lines.removeAt(i);
     }
-    if (this.form.invalid) {
+    if (this.form.invalid || (this.recurring() && this.schedule.invalid)) {
       this.form.markAllAsTouched();
+      this.schedule.markAllAsTouched();
       this.toast.error('Please complete the highlighted fields.');
       return;
     }
@@ -312,11 +457,16 @@ export class DocumentForm implements OnInit {
     this.errors.set({});
     const v = this.form.getRawValue();
     const id = this.id();
+    if (this.recurring()) {
+      this.saveProfile();
+      return;
+    }
     const keepStatus = id && status !== 'draft' && this.currentStatus() !== 'draft' ? undefined : status;
     const body = {
       ...v,
       number: v.number || undefined,
       due_date: v.due_date || null,
+      payment_terms: v.payment_terms || null,
       ...(keepStatus ? { status: keepStatus } : {}),
       ...(id ? {} : { type: this.docType() }),
     };
@@ -324,6 +474,37 @@ export class DocumentForm implements OnInit {
       next: (d) => {
         this.toast.success(`${this.cfg().label} ${d.number} saved`);
         void this.router.navigate([this.cfg().path, d.id]);
+      },
+      error: (e) => {
+        this.saving.set(false);
+        this.errors.set(fieldErrors(e));
+        this.toast.error(errorMessage(e));
+      },
+    });
+  }
+
+  private saveProfile(): void {
+    const v = this.form.getRawValue();
+    const sch = this.schedule.getRawValue();
+    const id = this.id();
+    const body = {
+      ...sch,
+      end_date: sch.end_date || null,
+      contact_id: v.contact_id,
+      payment_terms: v.payment_terms || null,
+      reference: v.reference,
+      discount: v.discount,
+      adjustment: v.adjustment,
+      notes: v.notes,
+      terms: v.terms,
+      items: v.items,
+      ...(id ? {} : { type: this.docType() }),
+    };
+    (id ? this.api.put<RecurringProfile>(`recurring-profiles/${id}`, body) : this.api.post<RecurringProfile>('recurring-profiles', body)).subscribe({
+      next: (p) => {
+        const made = id ? 0 : p.generated_count;
+        this.toast.success(`Recurring ${this.cfg().label.toLowerCase()} "${p.name}" saved` + (made ? ` · ${made} created now` : ''));
+        void this.router.navigateByUrl(this.backLink());
       },
       error: (e) => {
         this.saving.set(false);

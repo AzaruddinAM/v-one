@@ -4,6 +4,7 @@ import { Document, Organization, PdfOptions, PdfTemplateId } from '../../core/ap
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG } from '../../core/documents.config';
 import { amountInWords, DEFAULT_PDF_OPTIONS, PDF_FONTS } from '../../core/pdf-templates';
+import { taxProfile } from '../../core/tax-regime';
 import { calculateTotals } from '../../core/utils/totals';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -37,7 +38,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
                 @if (org()?.address) { {{ org()?.address }}<br /> }
                 @if (orgCity()) { {{ orgCity() }}<br /> }
               }
-              @if (o.show_org_gstin && org()?.gstin) { GSTIN: {{ org()?.gstin }}<br /> }
+              @if (o.show_org_gstin && org()?.gstin) { {{ tax().idLabel }}: {{ org()?.gstin }}<br /> }
               @if (o.show_org_phone && org()?.phone) { {{ org()?.phone }}<br /> }
               @if (o.show_org_email && org()?.email) { {{ org()?.email }} }
             </div>
@@ -64,12 +65,13 @@ import { MoneyPipe } from '../../shared/money.pipe';
             <div class="muted small">
               @if (c.company_name) { {{ c.company_name }}<br /> }
               @if (c.billing_address) { <span style="white-space:pre-line">{{ c.billing_address }}</span><br /> }
-              @if (c.gstin && o.show_customer_gstin) { GSTIN: {{ c.gstin }} }
+              @if (c.gstin && o.show_customer_gstin) { {{ tax().idLabel }}: {{ c.gstin }} }
             </div>
           }
         </div>
         <dl class="dl">
           <dt>{{ cfg().label }} date</dt><dd>{{ d.date | date: 'dd MMM yyyy' }}</dd>
+          @if (d.payment_terms) { <dt>Terms</dt><dd>{{ d.payment_terms }}</dd> }
           @if (d.due_date) { <dt>{{ cfg().dueLabel }}</dt><dd>{{ d.due_date | date: 'dd MMM yyyy' }}</dd> }
           @if (d.reference) { <dt>Reference</dt><dd>{{ d.reference }}</dd> }
         </dl>
@@ -122,7 +124,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
               <div class="row muted"><span>CGST &#64; {{ t.rate / 2 }}%</span><span class="mono">{{ t.amount / 2 | money }}</span></div>
               <div class="row muted"><span>SGST &#64; {{ t.rate / 2 }}%</span><span class="mono">{{ t.amount / 2 | money }}</span></div>
             } @else {
-              <div class="row muted"><span>Tax &#64; {{ t.rate }}%</span><span class="mono">{{ t.amount | money }}</span></div>
+              <div class="row muted"><span>{{ tax().tax }} &#64; {{ t.rate }}%</span><span class="mono">{{ t.amount | money }}</span></div>
             }
           }
           @if (d.discount) { <div class="row"><span>Discount</span><span class="mono">−{{ d.discount | money }}</span></div> }
@@ -163,6 +165,7 @@ export class DocumentSheet {
   readonly footer = input<string | null | undefined>(null);
 
   protected readonly cfg = computed(() => DOC_CONFIG[this.doc().type]);
+  protected readonly tax = computed(() => taxProfile(this.org()));
   protected readonly font = computed(() => PDF_FONTS[this.options().font] ?? 'inherit');
   protected readonly orgCity = computed(() => {
     const o = this.org();
@@ -171,7 +174,8 @@ export class DocumentSheet {
   protected readonly title = computed(() => {
     const d = this.doc();
     const o = this.options();
-    if (d.type === 'invoice') return o.title_invoice.trim() || (this.org()?.gstin ? 'TAX INVOICE' : 'INVOICE');
+    if (d.type === 'invoice') return o.title_invoice.trim() || (this.org()?.gstin ? this.tax().taxInvoiceTitle : 'INVOICE');
+    if (d.type === 'credit_note' && this.org()?.gstin && this.tax().regime === 'vat') return 'TAX CREDIT NOTE';
     if (d.type === 'estimate' && o.title_estimate.trim()) return o.title_estimate.trim();
     return this.cfg().label.toUpperCase();
   });
@@ -179,7 +183,7 @@ export class DocumentSheet {
   protected readonly halfTax = computed(() => {
     const o = this.org();
     const c = this.doc().contact;
-    return !!o?.gstin && (!c?.state || !o.state || c.state.toLowerCase() === o.state.toLowerCase());
+    return this.tax().splitCgstSgst && !!o?.gstin && (!c?.state || !o.state || c.state.toLowerCase() === o.state.toLowerCase());
   });
   protected readonly breakup = computed(() => calculateTotals(this.doc().items ?? []).taxBreakup);
   protected readonly words = computed(() => amountInWords(this.doc().total ?? 0, this.auth?.currency() ?? 'INR'));

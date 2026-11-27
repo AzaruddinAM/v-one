@@ -3,6 +3,8 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { Contact, ContactType } from '../../core/api/models';
+import { AuthStore } from '../../core/auth/auth.store';
+import { taxProfile } from '../../core/tax-regime';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage, fieldErrors } from '../../core/utils/http-error';
 import { FieldError } from '../../shared/field-error';
@@ -26,13 +28,19 @@ import { PageHeader } from '../../shared/page-header';
             </div>
             <div class="field"><label for="company">Company name</label><input id="company" class="input" formControlName="company_name" /></div>
             <div class="field">
+              <label for="code">Short code</label>
+              <input id="code" class="input" formControlName="code" maxlength="12" placeholder="e.g. TU" style="text-transform:uppercase" />
+              <small class="muted">Used by {{ '{CODE}' }} in invoice numbers (Settings → Transaction numbers).</small>
+              <app-field-error [server]="errors()['code']" />
+            </div>
+            <div class="field">
               <label for="email">Email</label>
               <input id="email" class="input" type="email" formControlName="email" />
               <app-field-error [control]="form.controls.email" [server]="errors()['email']" />
             </div>
             <div class="field"><label for="phone">Phone</label><input id="phone" class="input" type="tel" formControlName="phone" /></div>
-            <div class="field"><label for="gstin">GSTIN</label><input id="gstin" class="input" formControlName="gstin" placeholder="22AAAAA0000A1Z5" /></div>
-            <div class="field"><label for="pan">PAN</label><input id="pan" class="input" formControlName="pan" /></div>
+            <div class="field"><label for="gstin">{{ tax.idLabel }}</label><input id="gstin" class="input" formControlName="gstin" [placeholder]="tax.idPlaceholder" /></div>
+            @if (tax.regime === 'gst') { <div class="field"><label for="pan">PAN</label><input id="pan" class="input" formControlName="pan" /></div> }
             <div class="field">
               <label for="terms">Payment terms (days)</label>
               <input id="terms" class="input" type="number" min="0" formControlName="payment_terms" />
@@ -72,6 +80,7 @@ export class ContactForm implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  protected readonly tax = taxProfile(inject(AuthStore).organization());
 
   readonly id = input<string>();
   readonly contactType = input<ContactType>('customer');
@@ -83,6 +92,7 @@ export class ContactForm implements OnInit {
   protected readonly form = inject(NonNullableFormBuilder).group({
     name: ['', Validators.required],
     company_name: [''],
+    code: [''],
     email: ['', Validators.email],
     phone: [''],
     gstin: [''],

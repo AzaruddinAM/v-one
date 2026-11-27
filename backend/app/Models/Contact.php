@@ -12,7 +12,7 @@ class Contact extends Model
     use BelongsToOrganization, HasFactory;
 
     protected $fillable = [
-        'type', 'name', 'company_name', 'email', 'phone', 'gstin', 'pan', 'billing_address',
+        'type', 'name', 'company_name', 'code', 'email', 'phone', 'gstin', 'pan', 'billing_address',
         'shipping_address', 'city', 'state', 'country', 'pincode', 'opening_balance',
         'payment_terms', 'notes', 'is_active',
     ];

@@ -17,6 +17,7 @@ class ContactController extends Controller
             'type' => ['required', Rule::in(['customer', 'vendor'])],
             'name' => ['required', 'string', 'max:150'],
             'company_name' => ['nullable', 'string', 'max:150'],
+            'code' => ['nullable', 'string', 'max:12', 'regex:/^[A-Za-z0-9]+$/'],
             'email' => ['nullable', 'email', 'max:150'],
             'phone' => ['nullable', 'string', 'max:20'],
             'gstin' => ['nullable', 'string', 'max:30'],

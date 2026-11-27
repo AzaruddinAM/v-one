@@ -40,6 +40,46 @@ class OrganizationSetup
         ['GST 0%', 0], ['GST 5%', 5], ['GST 12%', 12], ['GST 18%', 18], ['GST 28%', 28],
     ];
 
+    /** UAE VAT: 5% standard, zero-rated and exempt (type EXEMPT is reported in box 5 of the VAT return). */
+    public const VAT_TAXES = [
+        ['VAT 5%', 5, 'VAT'], ['Zero rated 0%', 0, 'VAT'], ['Exempt', 0, 'EXEMPT'],
+    ];
+
+    /**
+     * Switch an organization's tax rates to its regime: creates the regime's standard rates
+     * if missing, activates them and deactivates the other regime's rates (kept for old documents).
+     */
+    public function applyTaxRegime(Organization $org): void
+    {
+        $now = now();
+        $taxes = DB::table('taxes')->where('organization_id', $org->id);
+        if ($org->tax_regime === 'vat') {
+            if (! (clone $taxes)->whereIn('type', ['VAT', 'EXEMPT'])->exists()) {
+                DB::table('taxes')->insert(array_map(fn ($t) => [
+                    'organization_id' => $org->id, 'name' => $t[0], 'rate' => $t[1], 'type' => $t[2],
+                    'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+                ], self::VAT_TAXES));
+            }
+            (clone $taxes)->whereIn('type', ['VAT', 'EXEMPT'])->update(['is_active' => true, 'updated_at' => $now]);
+            (clone $taxes)->where('type', 'GST')->update(['is_active' => false, 'updated_at' => $now]);
+        } elseif ($org->tax_regime === 'gst') {
+            if (! (clone $taxes)->where('type', 'GST')->exists()) {
+                $this->insertGst($org);
+            }
+            (clone $taxes)->where('type', 'GST')->update(['is_active' => true, 'updated_at' => $now]);
+            (clone $taxes)->whereIn('type', ['VAT', 'EXEMPT'])->update(['is_active' => false, 'updated_at' => $now]);
+        }
+    }
+
+    private function insertGst(Organization $org): void
+    {
+        $now = now();
+        DB::table('taxes')->insert(array_map(fn ($t) => [
+            'organization_id' => $org->id, 'name' => $t[0], 'rate' => $t[1], 'type' => 'GST',
+            'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+        ], self::TAXES));
+    }
+
     public function run(Organization $org): void
     {
         $now = now();
@@ -49,9 +89,10 @@ class OrganizationSetup
             'created_at' => $now, 'updated_at' => $now,
         ], self::ACCOUNTS));
 
-        DB::table('taxes')->insert(array_map(fn ($t) => [
-            'organization_id' => $org->id, 'name' => $t[0], 'rate' => $t[1], 'type' => 'GST',
-            'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
-        ], self::TAXES));
+        if (($org->tax_regime ?? 'gst') === 'gst') {
+            $this->insertGst($org);
+        } else {
+            $this->applyTaxRegime($org);
+        }
     }
 }

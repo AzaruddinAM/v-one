@@ -33,6 +33,7 @@ interface Column {
           <option value="month">This month</option>
           <option value="last-month">Last month</option>
           <option value="quarter">Last 3 months</option>
+          <option value="cal-quarter">Last calendar quarter</option>
           <option value="custom">Custom</option>
         </select>
         <input class="input input--sm" type="date" style="width:auto" [ngModel]="from()" (ngModelChange)="from.set($event); preset.set('custom')" />
@@ -87,6 +88,36 @@ interface Column {
               </tbody>
               <tfoot><tr class="grand"><td>Liabilities + Equity</td><td class="text-right mono">{{ d.total_liabilities + d.total_equity | money }}</td></tr></tfoot>
             </table>
+          }
+          @case ('vat-return') {
+            <div class="kpis tax">
+              <div class="card kpi"><div><div class="kpi__label">Output VAT (box 8)</div><div class="kpi__value">{{ d.output_vat | money }}</div></div></div>
+              <div class="card kpi"><div><div class="kpi__label">Recoverable VAT (box 12)</div><div class="kpi__value">{{ d.input_vat | money }}</div></div></div>
+              <div class="card kpi"><div><div class="kpi__label">{{ d.net_vat < 0 ? 'Refundable VAT' : 'Net VAT due' }} (box 14)</div><div class="kpi__value" [class.text-danger]="d.net_vat > 0">{{ d.net_vat | money }}</div></div></div>
+            </div>
+            <div class="tax-tables">
+              <table class="table statement">
+                <thead><tr><th style="width:60px">Box</th><th>VAT on sales and all other outputs</th><th class="text-right">Amount</th><th class="text-right">VAT</th></tr></thead>
+                <tbody>
+                  @for (l of d.supplies; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
+                  <tr class="subtotal"><td>8</td><td>Totals</td><td class="text-right mono">{{ d.supplies_total.amount | money }}</td><td class="text-right mono">{{ d.supplies_total.vat | money }}</td></tr>
+                </tbody>
+              </table>
+              <table class="table statement mt-2">
+                <thead><tr><th style="width:60px">Box</th><th>VAT on expenses and all other inputs</th><th class="text-right">Amount</th><th class="text-right">Recoverable VAT</th></tr></thead>
+                <tbody>
+                  @for (l of d.expenses; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
+                  <tr class="subtotal"><td>12</td><td>Totals</td><td class="text-right mono">{{ d.expenses_total.amount | money }}</td><td class="text-right mono">{{ d.expenses_total.vat | money }}</td></tr>
+                </tbody>
+                <tfoot><tr class="grand" [class.loss]="d.net_vat < 0"><td>14</td><td>Payable tax for the period</td><td></td><td class="text-right mono">{{ d.net_vat | money }}</td></tr></tfoot>
+              </table>
+              <p class="muted small mt-1">
+                Supplies are classified by the VAT rate on each invoice line: 5% = standard rated, 0% = zero rated, tax type EXEMPT = exempt.
+                Credit notes and vendor credits are deducted in the period they are dated.
+                @if (d.out_of_scope.amount) { Lines with no tax selected ({{ d.out_of_scope.amount | money }}) are left out as out of scope. }
+                Box 1 is not split by Emirate here; reverse-charge, tourist refunds and box 2/3/6/7/10/11 adjustments are entered on the FTA portal directly.
+              </p>
+            </div>
           }
           @case ('tax-summary') {
             <div class="kpis tax">
@@ -168,7 +199,7 @@ export class ReportView {
 
   protected readonly periodLabel = computed(() => {
     const p = this.def()?.period;
-    const fmt = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmt = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     if (p === 'range') return `${fmt(this.from())} – ${fmt(this.to())}`;
     if (p === 'asOf') return `As of ${fmt(this.to())}`;
     return `As of ${fmt(isoDate())}`;
@@ -278,6 +309,10 @@ export class ReportView {
     } else if (p === 'last-month') {
       this.from.set(isoDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
       this.to.set(isoDate(new Date(now.getFullYear(), now.getMonth(), 0)));
+    } else if (p === 'cal-quarter') {
+      const q = Math.floor(now.getMonth() / 3);
+      this.from.set(isoDate(new Date(now.getFullYear(), (q - 1) * 3, 1)));
+      this.to.set(isoDate(new Date(now.getFullYear(), q * 3, 0)));
     } else if (p === 'quarter') {
       this.from.set(isoDate(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())));
       this.to.set(isoDate());
@@ -302,6 +337,15 @@ export class ReportView {
       lines = [...statement([['Income', d.income, d.total_income], ['Expenses', d.expenses, d.total_expenses]]), ['Net profit', d.net_profit]];
     } else if (this.report() === 'balance-sheet') {
       lines = statement([['Assets', d.assets, d.total_assets], ['Liabilities', d.liabilities, d.total_liabilities], ['Equity', d.equity, d.total_equity]]);
+    } else if (this.report() === 'vat-return') {
+      lines = [
+        ['Box', 'Description', 'Amount', 'VAT'],
+        ...d.supplies.map((l: any) => [l.box, l.name, l.amount, l.vat]),
+        ['8', 'Totals', d.supplies_total.amount, d.supplies_total.vat],
+        ...d.expenses.map((l: any) => [l.box, l.name, l.amount, l.vat]),
+        ['12', 'Totals', d.expenses_total.amount, d.expenses_total.vat],
+        ['14', 'Payable tax for the period', '', d.net_vat],
+      ];
     } else if (this.report() === 'tax-summary') {
       lines = [['Type', 'Rate', 'Taxable', 'Tax'], ...d.output.map((r: any) => ['Output', r.rate, r.taxable, r.tax]), ...d.input.map((r: any) => ['Input', r.rate, r.taxable, r.tax]), ['Net payable', '', '', d.net_payable]];
     } else {

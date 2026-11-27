@@ -59,6 +59,11 @@ class ReportController extends Controller
         return $this->reports->taxSummary(...$this->period($request));
     }
 
+    public function vatReturn(Request $request)
+    {
+        return $this->reports->vatReturn(...$this->period($request));
+    }
+
     public function inventory()
     {
         return $this->reports->inventoryValuation();

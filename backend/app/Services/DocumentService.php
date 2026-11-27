@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Contact;
 use App\Models\Document;
 use App\Models\Payment;
 use App\Models\Tax;
@@ -32,12 +33,19 @@ class DocumentService
                 collect($calc)->except('lines')->all(),
             );
 
+            if (! empty($attrs['payment_terms']) && empty($attrs['due_date'])) {
+                $attrs['due_date'] = Document::dueDateFor($attrs['payment_terms'], $attrs['date'] ?? $document?->date?->toDateString() ?? today()->toDateString());
+            }
+
             if ($document) {
                 $document->fill($attrs);
             } else {
-                $attrs['number'] = $attrs['number'] ?? NumberGenerator::next(
-                    Document::where('type', $attrs['type']), Document::PREFIX[$attrs['type']]
-                );
+                $contact = Contact::find($attrs['contact_id'] ?? null);
+                if (empty($attrs['number'])) {
+                    $attrs['number'] = NumberGenerator::forDocument($attrs['type'], $contact, $attrs['date'] ?? null, reserve: true);
+                } else {
+                    NumberGenerator::noteManual($attrs['type'], $attrs['number'], $contact, $attrs['date'] ?? null);
+                }
                 $attrs['created_by'] = auth()->id();
                 $document = new Document($attrs);
             }
@@ -91,7 +99,7 @@ class DocumentService
         });
     }
 
-    /** Convert estimate/sales order → invoice, purchase order → bill. */
+    /** Convert estimate / sales order / delivery challan → invoice, purchase order → bill. */
     public function convert(Document $source, string $to): Document
     {
         $data = [
@@ -99,6 +107,7 @@ class DocumentService
             'contact_id' => $source->contact_id,
             'date' => today()->toDateString(),
             'due_date' => today()->addDays($source->contact->payment_terms ?? 30)->toDateString(),
+            'payment_terms' => $source->payment_terms,
             'status' => 'draft',
             'reference' => $source->number,
             'discount' => $source->discount,
@@ -113,7 +122,11 @@ class DocumentService
 
         return DB::transaction(function () use ($source, $data, $to) {
             $doc = $this->save($data);
-            $source->update(['status' => $source->type === 'estimate' ? 'accepted' : 'closed']);
+            $source->update(['status' => match ($source->type) {
+                'estimate' => 'accepted',
+                'delivery_challan' => 'invoiced',
+                default => 'closed',
+            }]);
 
             return $doc;
         });

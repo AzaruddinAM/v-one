@@ -9,6 +9,13 @@ const docRoutes = (path: string, type: DocumentType): Routes => [
   { path: `${path}/:id/edit`, data: { docType: type }, loadComponent: () => import('./features/documents/document-form').then((m) => m.DocumentForm) },
 ];
 
+/** Recurring profiles reuse the document form (with a schedule card) for create / edit. */
+const recurringRoutes = (path: string, type: 'invoice' | 'bill'): Routes => [
+  { path, data: { recurringType: type }, loadComponent: () => import('./features/recurring/recurring-list').then((m) => m.RecurringList) },
+  { path: `${path}/new`, data: { docType: type, recurring: true }, loadComponent: () => import('./features/documents/document-form').then((m) => m.DocumentForm) },
+  { path: `${path}/:id/edit`, data: { docType: type, recurring: true }, loadComponent: () => import('./features/documents/document-form').then((m) => m.DocumentForm) },
+];
+
 const contactRoutes = (path: string, type: 'customer' | 'vendor'): Routes => [
   { path, data: { contactType: type }, loadComponent: () => import('./features/contacts/contact-list').then((m) => m.ContactList) },
   { path: `${path}/new`, data: { contactType: type }, loadComponent: () => import('./features/contacts/contact-form').then((m) => m.ContactForm) },
@@ -43,9 +50,14 @@ export const routes: Routes = [
       { path: 'items/:id/edit', loadComponent: () => import('./features/items/item-form').then((m) => m.ItemForm) },
       ...docRoutes('sales/estimates', 'estimate'),
       ...docRoutes('sales/orders', 'sales_order'),
+      ...docRoutes('sales/delivery-challans', 'delivery_challan'),
+      ...recurringRoutes('sales/recurring-invoices', 'invoice'),
+      { path: 'sales/reminders', title: 'Payment reminders · v-one', loadComponent: () => import('./features/reminders/reminder-list').then((m) => m.ReminderList) },
       ...docRoutes('sales/invoices', 'invoice'),
       ...docRoutes('sales/credit-notes', 'credit_note'),
       ...docRoutes('purchases/orders', 'purchase_order'),
+      ...docRoutes('purchases/vendor-credits', 'vendor_credit'),
+      ...recurringRoutes('purchases/recurring-bills', 'bill'),
       { path: 'purchases/scan-bill', title: 'Scan bill · v-one', loadComponent: () => import('./features/ai/bill-scan').then((m) => m.BillScan) },
       ...docRoutes('purchases/bills', 'bill'),
       { path: 'payments/received', data: { direction: 'in' }, loadComponent: () => import('./features/payments/payment-list').then((m) => m.PaymentList) },
@@ -65,6 +77,7 @@ export const routes: Routes = [
           { path: 'organization', loadComponent: () => import('./features/settings/organization-settings').then((m) => m.OrganizationSettings) },
           { path: 'profile', loadComponent: () => import('./features/settings/profile-settings').then((m) => m.ProfileSettings) },
           { path: 'taxes', loadComponent: () => import('./features/settings/tax-settings').then((m) => m.TaxSettings) },
+          { path: 'numbering', loadComponent: () => import('./features/settings/numbering-settings').then((m) => m.NumberingSettings) },
           { path: 'pdf', loadComponent: () => import('./features/settings/pdf-settings').then((m) => m.PdfSettings) },
           { path: 'users', canActivate: [adminGuard], loadComponent: () => import('./features/settings/user-settings').then((m) => m.UserSettings) },
         ],

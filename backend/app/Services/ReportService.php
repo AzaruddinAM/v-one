@@ -113,6 +113,7 @@ class ReportService
         $sales = (float) $this->between($this->live('invoice'), $from, $to)->sum(DB::raw('subtotal - discount'));
         $returns = (float) $this->between($this->live('credit_note'), $from, $to)->sum(DB::raw('subtotal - discount'));
         $purchases = (float) $this->between($this->live('bill'), $from, $to)->sum(DB::raw('subtotal - discount'));
+        $purchaseReturns = (float) $this->between($this->live('vendor_credit'), $from, $to)->sum(DB::raw('subtotal - discount'));
 
         $accounts = Account::whereIn('type', ['income', 'expense'])->get()->keyBy('id');
         $journal = $this->journalNet($from, $to);
@@ -124,6 +125,9 @@ class ReportService
         $expenses = [];
         if ($purchases) {
             $expenses[] = ['name' => 'Purchases (Bills)', 'amount' => round($purchases, 2)];
+        }
+        if ($purchaseReturns) {
+            $expenses[] = ['name' => 'Less: Purchase Returns (Vendor Credits)', 'amount' => -round($purchaseReturns, 2)];
         }
 
         Expense::whereBetween('date', [$from, $to])
@@ -171,8 +175,10 @@ class ReportService
         $receivable = (float) $upTo($this->live('invoice'))->sum('balance')
             - (float) $upTo($this->live('credit_note'))->where('status', 'open')->sum('total');
         $inventory = (float) Item::where('track_inventory', true)->sum(DB::raw('stock_on_hand * purchase_price'));
-        $inputTax = (float) $upTo($this->live('bill'))->sum('tax_total') + (float) $upTo(Expense::query())->sum('tax_amount');
-        $payable = (float) $upTo($this->live('bill'))->sum('balance');
+        $inputTax = (float) $upTo($this->live('bill'))->sum('tax_total') + (float) $upTo(Expense::query())->sum('tax_amount')
+            - (float) $upTo($this->live('vendor_credit'))->sum('tax_total');
+        $payable = (float) $upTo($this->live('bill'))->sum('balance')
+            - (float) $upTo($this->live('vendor_credit'))->where('status', 'open')->sum('total');
         $outputTax = (float) $upTo($this->live('invoice'))->sum('tax_total') - (float) $upTo($this->live('credit_note'))->sum('tax_total');
 
         $assets = [
@@ -289,8 +295,24 @@ class ReportService
                 ->all();
         };
 
-        $output = $byRate('invoice');
-        $input = $byRate('bill');
+        // Credit notes / vendor credits reverse tax at the same rate.
+        $net = function (array $rows, array $less) {
+            foreach ($less as $l) {
+                $i = array_search($l['rate'], array_column($rows, 'rate'), true);
+                if ($i === false) {
+                    $rows[] = ['rate' => $l['rate'], 'taxable' => 0.0, 'tax' => 0.0];
+                    $i = array_key_last($rows);
+                }
+                $rows[$i]['taxable'] = round($rows[$i]['taxable'] - $l['taxable'], 2);
+                $rows[$i]['tax'] = round($rows[$i]['tax'] - $l['tax'], 2);
+            }
+            usort($rows, fn ($a, $b) => $a['rate'] <=> $b['rate']);
+
+            return $rows;
+        };
+
+        $output = $net($byRate('invoice'), $byRate('credit_note'));
+        $input = $net($byRate('bill'), $byRate('vendor_credit'));
         $expenseTax = (float) Expense::whereBetween('date', [$from, $to])->sum('tax_amount');
         $outTotal = array_sum(array_column($output, 'tax'));
         $inTotal = array_sum(array_column($input, 'tax')) + $expenseTax;
@@ -299,6 +321,74 @@ class ReportService
             'output' => $output, 'input' => $input, 'expense_tax' => round($expenseTax, 2),
             'output_total' => round($outTotal, 2), 'input_total' => round($inTotal, 2),
             'net_payable' => round($outTotal - $inTotal, 2),
+        ];
+    }
+
+    /**
+     * UAE VAT return (form VAT 201 layout): supplies split into standard-rated, zero-rated
+     * and exempt by the tax on each line, purchases and expenses with recoverable VAT, net due.
+     * Credit notes and vendor credits are deducted from the period they are dated in.
+     */
+    public function vatReturn(string $from, string $to): array
+    {
+        $lines = function (array $types) use ($from, $to) {
+            return DB::table('documents')
+                ->join('document_items as di', 'di.document_id', '=', 'documents.id')
+                ->leftJoin('taxes as t', 't.id', '=', 'di.tax_id')
+                ->where('documents.organization_id', auth()->user()->organization_id)
+                ->whereIn('documents.type', $types)->whereNotIn('documents.status', self::LIVE)
+                ->whereBetween('documents.date', [$from, $to])
+                ->select('documents.type', 'di.tax_rate', 't.type as tax_type', 'di.tax_id', 'di.amount', 'di.tax_amount',
+                    'documents.subtotal', 'documents.discount')
+                ->get();
+        };
+        // Document-level discount is spread over lines in proportion to their amount.
+        $share = fn ($r) => $r->subtotal > 0 ? (float) $r->amount * (1 - min(1, (float) $r->discount / (float) $r->subtotal)) : (float) $r->amount;
+        $sign = fn ($r) => in_array($r->type, ['credit_note', 'vendor_credit'], true) ? -1 : 1;
+
+        $boxes = ['standard' => [0.0, 0.0], 'zero' => [0.0, 0.0], 'exempt' => [0.0, 0.0], 'out_of_scope' => [0.0, 0.0]];
+        foreach ($lines(['invoice', 'credit_note']) as $r) {
+            $key = match (true) {
+                (float) $r->tax_rate > 0 => 'standard',
+                ! $r->tax_id => 'out_of_scope',
+                strtoupper((string) $r->tax_type) === 'EXEMPT' => 'exempt',
+                default => 'zero',
+            };
+            $boxes[$key][0] += $sign($r) * $share($r);
+            $boxes[$key][1] += $sign($r) * (float) $r->tax_amount;
+        }
+
+        $purchase = [0.0, 0.0];
+        foreach ($lines(['bill', 'vendor_credit']) as $r) {
+            if ((float) $r->tax_rate > 0) {
+                $purchase[0] += $sign($r) * $share($r);
+                $purchase[1] += $sign($r) * (float) $r->tax_amount;
+            }
+        }
+        $exp = Expense::whereBetween('date', [$from, $to])->where('tax_amount', '>', 0)
+            ->selectRaw('COALESCE(SUM(amount), 0) as amount, COALESCE(SUM(tax_amount), 0) as tax')->first();
+        $purchase[0] += (float) $exp->amount;
+        $purchase[1] += (float) $exp->tax;
+
+        $r2 = fn (array $p) => ['amount' => round($p[0], 2), 'vat' => round($p[1], 2)];
+        $supplies = [
+            ['box' => '1', 'name' => 'Standard rated supplies', ...$r2($boxes['standard'])],
+            ['box' => '4', 'name' => 'Zero rated supplies', ...$r2($boxes['zero'])],
+            ['box' => '5', 'name' => 'Exempt supplies', ...$r2($boxes['exempt'])],
+        ];
+        $outputVat = round($boxes['standard'][1], 2);
+        $inputVat = round($purchase[1], 2);
+
+        return [
+            'from' => $from, 'to' => $to,
+            'supplies' => $supplies,
+            'supplies_total' => ['amount' => round(array_sum(array_column($supplies, 'amount')), 2), 'vat' => $outputVat],
+            'out_of_scope' => $r2($boxes['out_of_scope']),
+            'expenses' => [['box' => '9', 'name' => 'Standard rated expenses', ...$r2($purchase)]],
+            'expenses_total' => $r2($purchase),
+            'output_vat' => $outputVat,
+            'input_vat' => $inputVat,
+            'net_vat' => round($outputVat - $inputVat, 2),
         ];
     }
 
@@ -322,10 +412,9 @@ class ReportService
 
         $this->between($this->live($docType), $from, $to)->where('contact_id', $contact->id)->get()
             ->each(fn ($d) => $entries->push(['date' => $d->date->toDateString(), 'type' => $docType, 'number' => $d->number, 'debit' => $d->total, 'credit' => 0]));
-        if ($isCustomer) {
-            $this->between($this->live('credit_note'), $from, $to)->where('contact_id', $contact->id)->get()
-                ->each(fn ($d) => $entries->push(['date' => $d->date->toDateString(), 'type' => 'credit_note', 'number' => $d->number, 'debit' => 0, 'credit' => $d->total]));
-        }
+        $creditType = $isCustomer ? 'credit_note' : 'vendor_credit';
+        $this->between($this->live($creditType), $from, $to)->where('contact_id', $contact->id)->get()
+            ->each(fn ($d) => $entries->push(['date' => $d->date->toDateString(), 'type' => $creditType, 'number' => $d->number, 'debit' => 0, 'credit' => $d->total]));
         Payment::where('contact_id', $contact->id)->whereBetween('date', [$from, $to])->get()
             ->each(fn ($p) => $entries->push(['date' => $p->date->toDateString(), 'type' => 'payment', 'number' => $p->number, 'debit' => 0, 'credit' => $p->amount]));
 

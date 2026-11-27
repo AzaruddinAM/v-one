@@ -20,10 +20,12 @@ export const DocumentListStore = signalStore(withPaginatedList<DocumentSummary>(
 const STATUS_TABS: Record<DocumentType, string[]> = {
   estimate: ['draft', 'sent', 'accepted', 'declined'],
   sales_order: ['draft', 'open', 'closed', 'void'],
+  delivery_challan: ['draft', 'open', 'delivered', 'invoiced', 'returned', 'void'],
   invoice: ['draft', 'sent', 'partial', 'overdue', 'paid', 'void'],
   credit_note: ['draft', 'open', 'void'],
   purchase_order: ['draft', 'open', 'closed', 'void'],
   bill: ['draft', 'open', 'partial', 'overdue', 'paid', 'void'],
+  vendor_credit: ['draft', 'open', 'closed', 'void'],
 };
 
 @Component({

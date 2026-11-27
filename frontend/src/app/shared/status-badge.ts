@@ -13,6 +13,11 @@ const TONES: Record<string, string> = {
   void: 'muted',
   active: 'success',
   inactive: 'muted',
+  delivered: 'success',
+  invoiced: 'success',
+  returned: 'warning',
+  paused: 'warning',
+  expired: 'muted',
 };
 
 @Component({

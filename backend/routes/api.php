@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\LookupController;
 use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\RecurringProfileController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\TaxController;
 use App\Http\Controllers\Api\UserController;
@@ -55,6 +56,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('items', ItemController::class)->middlewareFor('destroy', $canDelete);
 
     Route::get('documents/next-number', [DocumentController::class, 'nextNumber']);
+    Route::get('documents/overdue', [DocumentController::class, 'overdue']);
+    Route::post('documents/{document}/reminded', [DocumentController::class, 'reminded']);
+
+    Route::post('recurring-profiles/run', [RecurringProfileController::class, 'run']);
+    Route::post('recurring-profiles/{recurring_profile}/status', [RecurringProfileController::class, 'status']);
+    Route::apiResource('recurring-profiles', RecurringProfileController::class)->middlewareFor('destroy', $canDelete);
     Route::post('documents/{document}/status', [DocumentController::class, 'status']);
     Route::post('documents/{document}/convert', [DocumentController::class, 'convert']);
     Route::apiResource('documents', DocumentController::class)->middlewareFor('destroy', $canDelete);
@@ -79,6 +86,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('sales-by-customer', 'salesByCustomer');
         Route::get('sales-by-item', 'salesByItem');
         Route::get('tax-summary', 'taxSummary');
+        Route::get('vat-return', 'vatReturn');
         Route::get('inventory', 'inventory');
     });
 });

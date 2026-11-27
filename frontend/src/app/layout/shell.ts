@@ -108,8 +108,11 @@ export class Shell {
       items: [
         { label: 'Estimates', icon: 'estimate', link: '/sales/estimates' },
         { label: 'Sales Orders', icon: 'cart', link: '/sales/orders' },
+        { label: 'Delivery Challans', icon: 'truck', link: '/sales/delivery-challans' },
         { label: 'Invoices', icon: 'invoice', link: '/sales/invoices' },
+        { label: 'Recurring Invoices', icon: 'repeat', link: '/sales/recurring-invoices' },
         { label: 'Payments Received', icon: 'card', link: '/payments/received' },
+        { label: 'Payment Reminders', icon: 'bell', link: '/sales/reminders' },
         { label: 'Credit Notes', icon: 'return', link: '/sales/credit-notes' },
       ],
     },
@@ -118,8 +121,10 @@ export class Shell {
       items: [
         { label: 'Purchase Orders', icon: 'cart', link: '/purchases/orders' },
         { label: 'Bills', icon: 'receipt', link: '/purchases/bills' },
+        { label: 'Recurring Bills', icon: 'repeat', link: '/purchases/recurring-bills' },
         { label: 'Scan Bill (AI)', icon: 'sparkles', link: '/purchases/scan-bill' },
         { label: 'Payments Made', icon: 'card', link: '/payments/made' },
+        { label: 'Vendor Credits', icon: 'return', link: '/purchases/vendor-credits' },
         { label: 'Expenses', icon: 'wallet', link: '/expenses' },
       ],
     },

@@ -46,13 +46,17 @@ class Organization extends Model
 
     protected $fillable = [
         'name', 'phone', 'email', 'industry', 'address', 'city', 'state', 'country', 'pincode',
-        'gstin', 'currency', 'currency_symbol', 'fiscal_year_start', 'date_format',
+        'gstin', 'tax_regime', 'currency', 'currency_symbol', 'fiscal_year_start', 'date_format',
         'invoice_terms', 'invoice_notes', 'pdf_template', 'pdf_accent', 'pdf_footer', 'pdf_options',
+        'number_series', 'reminder_template',
     ];
+
+    /** gst = India GST (GSTIN, CGST/SGST), vat = UAE VAT (TRN, VAT return), none = plain sales tax. */
+    public const TAX_REGIMES = ['gst', 'vat', 'none'];
 
     protected function casts(): array
     {
-        return ['fiscal_year_start' => 'integer', 'pdf_options' => 'array'];
+        return ['fiscal_year_start' => 'integer', 'pdf_options' => 'array', 'number_series' => 'array'];
     }
 
     public function users(): HasMany

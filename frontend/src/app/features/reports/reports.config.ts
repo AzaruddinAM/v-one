@@ -5,6 +5,8 @@ export interface ReportDef {
   group: 'Business overview' | 'Sales' | 'Receivables & payables' | 'Tax & inventory';
   icon: string;
   period: 'range' | 'asOf' | 'none';
+  /** Only listed for organizations on this tax system. */
+  regime?: 'gst' | 'vat';
 }
 
 export const REPORTS: ReportDef[] = [
@@ -14,6 +16,7 @@ export const REPORTS: ReportDef[] = [
   { key: 'sales-by-item', title: 'Sales by Item', description: 'Quantities and revenue per item.', group: 'Sales', icon: 'box', period: 'range' },
   { key: 'receivables', title: 'Receivables Aging', description: 'Outstanding invoices grouped by days overdue.', group: 'Receivables & payables', icon: 'invoice', period: 'none' },
   { key: 'payables', title: 'Payables Aging', description: 'Unpaid bills grouped by days overdue.', group: 'Receivables & payables', icon: 'receipt', period: 'none' },
+  { key: 'vat-return', title: 'VAT Return (VAT 201)', description: 'UAE VAT return boxes: standard, zero-rated and exempt supplies, recoverable VAT, net VAT due.', group: 'Tax & inventory', icon: 'percent', period: 'range', regime: 'vat' },
   { key: 'tax-summary', title: 'GST / Tax Summary', description: 'Output tax vs input tax credit and net payable.', group: 'Tax & inventory', icon: 'percent', period: 'range' },
   { key: 'inventory', title: 'Inventory Valuation', description: 'Stock on hand and its value at cost.', group: 'Tax & inventory', icon: 'box', period: 'none' },
 ];

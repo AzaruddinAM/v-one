@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Document;
 use App\Models\Organization;
+use App\Services\OrganizationSetup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
@@ -55,7 +57,28 @@ class OrganizationController extends Controller
             }
         }
 
+        // Tax regime, number series and reminders (deploy/sql/upgrade-2026-11-billing-features.sql).
+        if (Schema::hasColumn('organizations', 'tax_regime')) {
+            $rules += [
+                'tax_regime' => ['sometimes', Rule::in(Organization::TAX_REGIMES)],
+                'reminder_template' => ['nullable', 'string', 'max:2000'],
+                'number_series' => ['sometimes', 'nullable', 'array'],
+                'number_series.*' => ['array'],
+                'number_series.*.prefix' => ['nullable', 'string', 'max:30', 'regex:/^[A-Za-z0-9\-\/_.#{} ]*$/'],
+                'number_series.*.next' => ['nullable', 'integer', 'min:1', 'max:999999999'],
+                'number_series.*.digits' => ['nullable', 'integer', 'between:1,10'],
+            ];
+        }
+
         $data = $request->validate($rules);
+        if (isset($data['number_series'])) {
+            $data['number_series'] = collect($data['number_series'])->only(Document::TYPES)
+                ->map(fn ($s) => [
+                    'prefix' => trim((string) ($s['prefix'] ?? '')),
+                    'next' => (int) ($s['next'] ?? 1) ?: 1,
+                    'digits' => (int) ($s['digits'] ?? 5) ?: 5,
+                ])->all();
+        }
         if (isset($data['pdf_options'])) {
             // Keep only known keys, with booleans stored as real booleans.
             $options = Arr::only($data['pdf_options'], array_keys(Organization::pdfOptionRules()));
@@ -67,7 +90,11 @@ class OrganizationController extends Controller
             $data['pdf_options'] = $options;
         }
 
+        $regimeChanged = isset($data['tax_regime']) && $data['tax_regime'] !== $org->tax_regime;
         $org->update($data);
+        if ($regimeChanged) {
+            (new OrganizationSetup)->applyTaxRegime($org);
+        }
 
         return $org->fresh();
     }

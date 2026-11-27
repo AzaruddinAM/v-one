@@ -12,6 +12,7 @@ export interface Organization {
   country?: string | null;
   pincode?: string | null;
   gstin?: string | null;
+  tax_regime?: TaxRegime | null;
   currency: string;
   currency_symbol: string;
   fiscal_year_start: number;
@@ -22,6 +23,19 @@ export interface Organization {
   pdf_accent?: string | null;
   pdf_footer?: string | null;
   pdf_options?: Partial<PdfOptions> | null;
+  /** Custom numbering per document type. Empty prefix = default style (INV-00001). */
+  number_series?: Partial<Record<DocumentType, NumberSeries>> | null;
+  /** Payment reminder message with {customer} {invoice} {amount} {due_date} {days} {org} placeholders. */
+  reminder_template?: string | null;
+}
+
+export type TaxRegime = 'gst' | 'vat' | 'none';
+
+export interface NumberSeries {
+  /** e.g. "INV-{YY}-{CODE}-"; placeholders {YYYY} {YY} {MM} {FY} {CODE}. */
+  prefix: string;
+  next: number;
+  digits: number;
 }
 
 export type PdfTemplateId = 'classic' | 'modern' | 'minimal' | 'gst';
@@ -116,6 +130,8 @@ export interface Contact {
   type: ContactType;
   name: string;
   company_name?: string | null;
+  /** Short code used by {CODE} in invoice numbers, e.g. "TU". */
+  code?: string | null;
   email?: string | null;
   phone?: string | null;
   gstin?: string | null;
@@ -157,7 +173,15 @@ export interface Item {
   is_active?: boolean;
 }
 
-export type DocumentType = 'estimate' | 'sales_order' | 'invoice' | 'credit_note' | 'purchase_order' | 'bill';
+export type DocumentType =
+  | 'estimate'
+  | 'sales_order'
+  | 'delivery_challan'
+  | 'invoice'
+  | 'credit_note'
+  | 'purchase_order'
+  | 'bill'
+  | 'vendor_credit';
 
 export interface DocumentLine {
   id?: number;
@@ -190,6 +214,10 @@ export interface DocumentSummary {
 export interface Document extends DocumentSummary {
   reference?: string | null;
   contact_id: number;
+  payment_terms?: string | null;
+  recurring_profile_id?: number | null;
+  reminded_at?: string | null;
+  reminder_count?: number;
   subtotal: number;
   discount: number;
   tax_total: number;
@@ -265,6 +293,45 @@ export interface Lookups {
   payment_modes: PaymentMode[];
   units: string[];
   statuses: Record<DocumentType, string[]>;
+  payment_terms?: string[];
+  tax_regime?: TaxRegime;
+}
+
+export type RecurringType = 'invoice' | 'bill';
+export type RecurringFrequency = 'week' | 'month' | 'year';
+
+export interface RecurringProfile {
+  id: number;
+  type: RecurringType;
+  name: string;
+  contact_id: number;
+  contact?: Contact;
+  frequency: RecurringFrequency;
+  interval: number;
+  start_date: string;
+  end_date?: string | null;
+  next_date: string;
+  status: 'active' | 'paused' | 'expired';
+  auto_send: boolean;
+  payment_terms?: string | null;
+  template: {
+    reference?: string | null;
+    discount?: number;
+    adjustment?: number;
+    notes?: string | null;
+    terms?: string | null;
+    items: DocumentLine[];
+  };
+  generated_count: number;
+  last_generated_at?: string | null;
+  documents?: DocumentSummary[];
+}
+
+export interface OverdueInvoice extends DocumentSummary {
+  reminded_at?: string | null;
+  reminder_count: number;
+  days_overdue: number;
+  contact: Pick<Contact, 'id' | 'name' | 'company_name' | 'email' | 'phone'>;
 }
 
 export interface Dashboard {

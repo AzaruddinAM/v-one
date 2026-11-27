@@ -1,15 +1,20 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
-import { Organization } from '../../core/api/models';
+import { Organization, TaxRegime } from '../../core/api/models';
+import { LookupsStore } from '../../core/state/lookups.store';
+import { REGIME_DEFAULTS, TAX_REGIMES, taxProfile } from '../../core/tax-regime';
 import { AuthStore } from '../../core/auth/auth.store';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
 import { FieldError } from '../../shared/field-error';
 
+import { DEFAULT_REMINDER } from '../reminders/reminder-text';
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const CURRENCIES = [
-  ['INR', '₹'], ['USD', '$'], ['EUR', '€'], ['GBP', '£'], ['AED', 'د.إ'], ['SAR', '﷼'], ['QAR', 'ر.ق'], ['OMR', 'ر.ع.'], ['KWD', 'د.ك'], ['SGD', 'S$'], ['AUD', 'A$'], ['CAD', 'C$'],
+  ['INR', '₹'], ['USD', '$'], ['EUR', '€'], ['GBP', '£'], ['AED', 'AED'], ['SAR', '﷼'], ['QAR', 'ر.ق'], ['OMR', 'ر.ع.'], ['KWD', 'د.ك'], ['SGD', 'S$'], ['AUD', 'A$'], ['CAD', 'C$'],
 ];
 
 @Component({
@@ -29,14 +34,21 @@ const CURRENCIES = [
               <app-field-error [control]="form.controls.name" label="Name" />
             </div>
             <div class="field"><label for="oi">Industry</label><input id="oi" class="input" formControlName="industry" placeholder="Retail, Services…" /></div>
-            <div class="field"><label for="og">GSTIN / Tax ID</label><input id="og" class="input" formControlName="gstin" /></div>
+            <div class="field">
+              <label for="otr">Tax system</label>
+              <select id="otr" class="select" formControlName="tax_regime" (change)="applyRegime()">
+                @for (r of regimes; track r.id) { <option [value]="r.id">{{ r.label }}</option> }
+              </select>
+              <small class="muted">{{ regimeHint() }}</small>
+            </div>
+            <div class="field"><label for="og">{{ profile().idLabel }}</label><input id="og" class="input" formControlName="gstin" [placeholder]="profile().idPlaceholder" /></div>
             <div class="field"><label for="op">Phone</label><input id="op" class="input" formControlName="phone" /></div>
             <div class="field"><label for="oe">Email</label><input id="oe" class="input" type="email" formControlName="email" /></div>
             <div class="field span-all"><label for="oa">Address</label><textarea id="oa" class="textarea" formControlName="address" rows="2"></textarea></div>
             <div class="field"><label for="oc">City</label><input id="oc" class="input" formControlName="city" /></div>
             <div class="field"><label for="os">State</label><input id="os" class="input" formControlName="state" /></div>
             <div class="field"><label for="oco">Country</label><input id="oco" class="input" formControlName="country" /></div>
-            <div class="field"><label for="opi">PIN code</label><input id="opi" class="input" formControlName="pincode" /></div>
+            <div class="field"><label for="opi">{{ profile().regime === 'gst' ? 'PIN code' : 'Postal code / PO Box' }}</label><input id="opi" class="input" formControlName="pincode" /></div>
           </div>
         </div>
         <div class="form-section">
@@ -56,6 +68,11 @@ const CURRENCIES = [
             </div>
             <div class="field span-all"><label for="ot">Default invoice terms</label><textarea id="ot" class="textarea" formControlName="invoice_terms" rows="2"></textarea></div>
             <div class="field span-all"><label for="ono">Default customer notes</label><textarea id="ono" class="textarea" formControlName="invoice_notes" rows="2"></textarea></div>
+            <div class="field span-all">
+              <label for="orm">Payment reminder message</label>
+              <textarea id="orm" class="textarea" formControlName="reminder_template" rows="4" [placeholder]="defaultReminder"></textarea>
+              <small class="muted">Used on the Payment Reminders page. Placeholders: {{ '{customer} {invoice} {amount} {due_date} {days} {org}' }}. Leave empty for the default.</small>
+            </div>
           </div>
         </div>
       </div>
@@ -72,10 +89,14 @@ export class OrganizationSettings implements OnInit {
   protected readonly months = MONTHS;
   protected readonly currencies = CURRENCIES;
   protected readonly saving = signal(false);
+  protected readonly regimes = TAX_REGIMES;
+  private readonly lookups = inject(LookupsStore);
+  protected readonly defaultReminder = DEFAULT_REMINDER;
 
   protected readonly form = inject(NonNullableFormBuilder).group({
     name: ['', Validators.required],
     industry: [''],
+    tax_regime: ['gst' as TaxRegime],
     gstin: [''],
     phone: [''],
     email: [''],
@@ -89,10 +110,21 @@ export class OrganizationSettings implements OnInit {
     fiscal_year_start: [4],
     invoice_terms: [''],
     invoice_notes: [''],
+    reminder_template: [''],
   });
 
+  private readonly regime = toSignal(this.form.controls.tax_regime.valueChanges, { initialValue: this.form.controls.tax_regime.value });
+  protected readonly profile = computed(() => taxProfile({ tax_regime: this.regime() }));
+  protected readonly regimeHint = computed(() => TAX_REGIMES.find((r) => r.id === this.regime())?.hint ?? '');
+
+  /** Switching tax system fills the usual currency, symbol, financial year and country for it. */
+  applyRegime(): void {
+    const d = REGIME_DEFAULTS[this.form.controls.tax_regime.value];
+    this.form.patchValue({ currency: d.currency, currency_symbol: d.currency_symbol, fiscal_year_start: d.fiscal_year_start, ...(d.country ? { country: d.country } : {}) });
+  }
+
   ngOnInit(): void {
-    this.api.get<Organization>('organization').subscribe((o) => this.form.patchValue(o as never));
+    this.api.get<Organization>('organization').subscribe((o) => this.form.patchValue({ ...o, tax_regime: o.tax_regime ?? 'gst', reminder_template: o.reminder_template ?? '' } as never));
     if (!this.auth.isAdmin()) this.form.disable();
   }
 
@@ -110,6 +142,7 @@ export class OrganizationSettings implements OnInit {
     this.api.put<Organization>('organization', this.form.getRawValue()).subscribe({
       next: (o) => {
         this.auth.setOrganization(o);
+        this.lookups.load({ force: true }); // tax rates change with the tax system
         this.saving.set(false);
         this.toast.success('Organization updated');
       },

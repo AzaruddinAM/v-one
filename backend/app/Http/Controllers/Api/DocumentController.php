@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contact;
 use App\Models\Document;
 use App\Services\DocumentService;
 use App\Services\NumberGenerator;
@@ -27,6 +28,7 @@ class DocumentController extends Controller
             'contact_id' => ['required', Tenant::exists('contacts')->where('type', $contactType)],
             'date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:date'],
+            'payment_terms' => ['nullable', 'string', 'max:30'],
             'status' => ['nullable', Rule::in(Document::MANUAL_STATUSES[$type] ?? ['draft'])],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'adjustment' => ['nullable', 'numeric'],
@@ -106,7 +108,7 @@ class DocumentController extends Controller
 
     public function convert(Request $request, Document $document)
     {
-        $map = ['estimate' => 'invoice', 'sales_order' => 'invoice', 'purchase_order' => 'bill'];
+        $map = ['estimate' => 'invoice', 'sales_order' => 'invoice', 'delivery_challan' => 'invoice', 'purchase_order' => 'bill'];
         abort_unless(isset($map[$document->type]), 422, 'This document cannot be converted.');
         abort_if($document->status === 'void', 422, 'Void documents cannot be converted.');
 
@@ -115,8 +117,35 @@ class DocumentController extends Controller
 
     public function nextNumber(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(Document::TYPES)]]);
+        $data = $request->validate([
+            'type' => ['required', Rule::in(Document::TYPES)],
+            'contact_id' => ['nullable', 'integer'],
+            'date' => ['nullable', 'date'],
+        ]);
+        $contact = isset($data['contact_id']) ? Contact::find($data['contact_id']) : null;
 
-        return ['number' => NumberGenerator::next(Document::where('type', $data['type']), Document::PREFIX[$data['type']])];
+        return ['number' => NumberGenerator::forDocument($data['type'], $contact, $data['date'] ?? null)];
+    }
+
+    /** Overdue invoices with the customer's contact details, for the payment reminders page. */
+    public function overdue(Request $request)
+    {
+        $docs = Document::where('type', 'invoice')->whereNotIn('status', ['draft', 'void', 'paid'])
+            ->where('balance', '>', 0)->whereNotNull('due_date')->where('due_date', '<', today())
+            ->when($request->contact_id, fn ($q, $c) => $q->where('contact_id', $c))
+            ->with('contact:id,name,company_name,email,phone')
+            ->orderBy('due_date')->limit(500)
+            ->get(['id', 'type', 'number', 'contact_id', 'date', 'due_date', 'status', 'total', 'balance', 'reminded_at', 'reminder_count']);
+
+        return $docs->map(fn (Document $d) => $d->toArray() + ['days_overdue' => (int) $d->due_date->diffInDays(today())]);
+    }
+
+    /** Record that a payment reminder was sent (by email / WhatsApp from the browser). */
+    public function reminded(Document $document)
+    {
+        abort_unless($document->type === 'invoice', 422, 'Reminders are only for invoices.');
+        $document->forceFill(['reminded_at' => now(), 'reminder_count' => $document->reminder_count + 1])->save();
+
+        return $document->only(['id', 'reminded_at', 'reminder_count']);
     }
 }

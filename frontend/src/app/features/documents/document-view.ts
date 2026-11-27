@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, si
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
-import { Document, DocumentType, PdfTemplateId } from '../../core/api/models';
+import { Document, DocumentType, OverdueInvoice, PdfTemplateId } from '../../core/api/models';
+import { isoDate } from '../../core/utils/dates';
+import { mailtoLink, reminderText, whatsappLink } from '../reminders/reminder-text';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG, docPath } from '../../core/documents.config';
 import { orgPdfAccent, orgPdfOptions, orgPdfTemplate, PAPER_SIZES, PDF_TEMPLATES } from '../../core/pdf-templates';
@@ -36,7 +38,13 @@ import { DocumentSheet } from './document-sheet';
         @if (cfg().payable && d.balance > 0 && d.status !== 'draft' && d.status !== 'void') {
           <button type="button" class="btn btn--success btn--sm" (click)="paying.set(true)"><app-icon name="card" [size]="16" /> Record payment</button>
         }
-        @if (cfg().convertTo && d.status !== 'void' && d.status !== 'closed' && d.status !== 'declined') {
+        @if (d.type === 'delivery_challan' && d.status === 'open') {
+          <button type="button" class="btn btn--outline btn--sm" (click)="setStatus('delivered')"><app-icon name="check" [size]="16" /> Mark delivered</button>
+        }
+        @if (overdue()) {
+          <button type="button" class="btn btn--outline btn--sm" (click)="remind()" [title]="'Send a payment reminder' + (d.reminder_count ? ' (sent ' + d.reminder_count + ' time(s))' : '')"><app-icon name="bell" [size]="16" /> Remind</button>
+        }
+        @if (cfg().convertTo && !['void', 'closed', 'declined', 'invoiced', 'returned'].includes(d.status)) {
           <button type="button" class="btn btn--sm" (click)="convert()"><app-icon name="convert" [size]="16" /> Convert to {{ convertLabel() }}</button>
         }
         @if (d.type === 'estimate' && d.status === 'sent') {
@@ -53,6 +61,9 @@ import { DocumentSheet } from './document-sheet';
           <button type="button" class="btn btn--outline btn--sm btn--icon" (click)="menu.set(!menu())" aria-label="More"><app-icon name="chevron-down" [size]="16" /></button>
           @if (menu()) {
             <div class="dropdown">
+              @if (d.type === 'delivery_challan' && (d.status === 'open' || d.status === 'delivered')) {
+                <button type="button" (click)="menu.set(false); setStatus('returned')"><app-icon name="return" /> Mark returned</button>
+              }
               @if (d.status !== 'void' && !d.amount_paid) {
                 <button type="button" (click)="voidDoc()"><app-icon name="ban" /> Void</button>
               }
@@ -64,6 +75,11 @@ import { DocumentSheet } from './document-sheet';
         </div>
       </div>
 
+      @if (d.recurring_profile_id) {
+        <div class="alert alert--info no-print" style="margin-bottom:16px">
+          Created automatically by a <a [routerLink]="recurringLink(d)">&nbsp;recurring {{ cfg().label.toLowerCase() }} profile</a>
+        </div>
+      }
       @if (d.converted_from) {
         <div class="alert alert--info no-print" style="margin-bottom:16px">
           Created from <a [routerLink]="link(d.converted_from.type, d.converted_from.id)">&nbsp;{{ d.converted_from.number }}</a>
@@ -129,6 +145,10 @@ export class DocumentView implements OnInit {
   protected readonly accent = computed(() => orgPdfAccent(this.org()));
   protected readonly opts = computed(() => orgPdfOptions(this.org()));
   protected readonly sendStatus = computed(() => (['invoice', 'estimate'].includes(this.docType()) ? 'sent' : 'open'));
+  protected readonly overdue = computed(() => {
+    const d = this.doc();
+    return !!d && d.type === 'invoice' && d.balance > 0 && !!d.due_date && d.due_date < isoDate() && !['draft', 'void'].includes(d.status);
+  });
   protected readonly convertLabel = computed(() => (this.cfg().convertTo ? DOC_CONFIG[this.cfg().convertTo!].label : ''));
 
   ngOnInit(): void {
@@ -189,6 +209,30 @@ export class DocumentView implements OnInit {
     if (await this.confirm.ask('Delete payment?', 'The balance due will be updated.', { confirmText: 'Delete', danger: true })) {
       this.api.delete(`payments/${id}`).subscribe({ next: () => this.load(), error: (e) => this.toast.error(errorMessage(e)) });
     }
+  }
+
+  protected recurringLink(d: Document): string {
+    return (d.type === 'bill' ? '/purchases/recurring-bills/' : '/sales/recurring-invoices/') + d.recurring_profile_id + '/edit';
+  }
+
+  /** Opens WhatsApp (or email when there is no phone) with the reminder text, and records it. */
+  remind(): void {
+    const d = this.doc();
+    const c = d?.contact;
+    if (!d || !c) return;
+    if (!c.phone && !c.email) {
+      this.toast.error('Add a phone number or email to this customer first.');
+      return;
+    }
+    const days = Math.round((Date.now() - new Date(d.due_date + 'T00:00:00').getTime()) / 86_400_000);
+    const inv = { ...d, days_overdue: days, reminder_count: d.reminder_count ?? 0, contact: c } as OverdueInvoice;
+    const org = this.org();
+    const text = reminderText(org?.reminder_template, [inv], org?.name ?? '', this.auth.currency());
+    window.open(c.phone ? whatsappLink(c.phone, text) : mailtoLink(c.email, `Payment reminder: ${d.number}`, text), '_blank', 'noopener');
+    this.api.post<{ reminder_count: number }>(`documents/${d.id}/reminded`).subscribe((r) => {
+      this.doc.set({ ...d, reminder_count: r.reminder_count });
+      this.toast.success('Reminder noted');
+    });
   }
 
   protected pickTemplate(e: Event): void {

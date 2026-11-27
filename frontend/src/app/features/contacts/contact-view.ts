@@ -3,6 +3,8 @@ import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
 import { ContactDetail, ContactType } from '../../core/api/models';
+import { AuthStore } from '../../core/auth/auth.store';
+import { taxProfile } from '../../core/tax-regime';
 import { DOC_CONFIG, docPath } from '../../core/documents.config';
 import { fiscalYearStart, isoDate } from '../../core/utils/dates';
 import { Icon } from '../../shared/icon';
@@ -88,8 +90,9 @@ interface Statement {
           <dl class="dl card__body">
             <dt>Phone</dt><dd>{{ c.phone || '—' }}</dd>
             <dt>Email</dt><dd>{{ c.email || '—' }}</dd>
-            <dt>GSTIN</dt><dd>{{ c.gstin || '—' }}</dd>
-            <dt>PAN</dt><dd>{{ c.pan || '—' }}</dd>
+            <dt>{{ tax.idLabel }}</dt><dd>{{ c.gstin || '—' }}</dd>
+            @if (tax.regime === 'gst') { <dt>PAN</dt><dd>{{ c.pan || '—' }}</dd> }
+            @if (c.code) { <dt>Short code</dt><dd>{{ c.code }}</dd> }
             <dt>Payment terms</dt><dd>Net {{ c.payment_terms }} days</dd>
             <dt>Billing address</dt><dd style="white-space:pre-line">{{ c.billing_address || '—' }}<br />{{ cityLine(c) }}</dd>
             <dt>Notes</dt><dd>{{ c.notes || '—' }}</dd>
@@ -103,6 +106,7 @@ interface Statement {
 })
 export class ContactView implements OnInit {
   private readonly api = inject(ApiService);
+  protected readonly tax = taxProfile(inject(AuthStore).organization());
   readonly id = input.required<string>();
   readonly contactType = input<ContactType>('customer');
 

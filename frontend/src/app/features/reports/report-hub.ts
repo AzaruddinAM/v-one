@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { AuthStore } from '../../core/auth/auth.store';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/icon';
 import { PageHeader } from '../../shared/page-header';
@@ -37,8 +38,12 @@ import { REPORTS } from './reports.config';
   `,
 })
 export class ReportHub {
-  protected readonly groups = [...new Set(REPORTS.map((r) => r.group))];
+  private readonly regime = inject(AuthStore).organization()?.tax_regime ?? 'gst';
+  private readonly reports = REPORTS.filter((r) => !r.regime || r.regime === this.regime).map((r) =>
+    r.key === 'tax-summary' && this.regime !== 'gst' ? { ...r, title: this.regime === 'vat' ? 'VAT Summary by Rate' : 'Tax Summary' } : r,
+  );
+  protected readonly groups = [...new Set(this.reports.map((r) => r.group))];
   protected byGroup(g: string) {
-    return REPORTS.filter((r) => r.group === g);
+    return this.reports.filter((r) => r.group === g);
   }
 }
