@@ -74,6 +74,26 @@ import { errorMessage } from '../../core/utils/http-error';
         }
       </div>
     </fieldset>
+
+    <fieldset class="card" [disabled]="!auth.isAdmin() || saving()">
+      <div class="card__header">
+        <div>
+          <h2>Barcode and QR scanning</h2>
+          <p class="muted">Add items to invoices, bills and estimates by scanning, and save each item's barcode on the item page.</p>
+        </div>
+      </div>
+      <div class="card__body">
+        <label class="checkbox">
+          <input type="checkbox" [checked]="prefs().barcode_scan" (change)="save({ barcode_scan: $any($event.target).checked })" />
+          Scan items on invoices, bills and estimates
+        </label>
+        <p class="muted small">
+          <strong>Phone camera:</strong> works in Chrome on Android (and Chrome or Edge on a Mac). iPhones and Windows PCs can't read barcodes with the camera in the browser yet, so use a scanner there.
+          <strong>USB or Bluetooth scanner:</strong> just scan while the invoice is open; a scan of a code already on the bill adds one more.
+          Codes match the item's Barcode field first, then its SKU.
+        </p>
+      </div>
+    </fieldset>
   `,
   styles: `
     fieldset.card { border: 1px solid var(--border); padding: 0; margin: 0 0 16px; min-width: 0; }

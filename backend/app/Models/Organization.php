@@ -62,6 +62,7 @@ class Organization extends Model
             'line_image_docs.*' => [\Illuminate\Validation\Rule::in(Document::TYPES)],
             'line_image_size' => ['sometimes', 'in:s,m,l'],
             'line_image_layout' => ['sometimes', 'in:column,below,gallery'],
+            'barcode_scan' => ['sometimes', 'boolean'],
         ];
     }
 

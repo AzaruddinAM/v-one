@@ -10,15 +10,19 @@ import { errorMessage, fieldErrors } from '../../core/utils/http-error';
 import { resizeImage } from '../../core/utils/image';
 import { FieldError } from '../../shared/field-error';
 import { PageHeader } from '../../shared/page-header';
+import { BarcodeScanner } from '../../shared/barcode-scanner';
+import { Icon } from '../../shared/icon';
 
 @Component({
   selector: 'app-item-form',
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError, Icon, BarcodeScanner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     .photo { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
     .photo img { width: 72px; height: 72px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
     .photo label { cursor: pointer; }
+    .barcode { display: flex; gap: 6px; }
+    .barcode .input { min-width: 0; }
   `,
   template: `
     <app-page-header [title]="id() ? 'Edit item' : 'New item'" />
@@ -43,6 +47,17 @@ import { PageHeader } from '../../shared/page-header';
               <input id="sku" class="input" formControlName="sku" />
               <app-field-error [server]="errors()['sku']" />
             </div>
+            <div class="field">
+              <label for="barcode">Barcode / QR</label>
+              <div class="barcode">
+                <input id="barcode" class="input" formControlName="barcode" autocomplete="off" placeholder="Scan or type" />
+                <button type="button" class="btn btn--outline btn--icon" (click)="scanning.set(true)" aria-label="Scan barcode with the camera" title="Scan with the camera"><app-icon name="scan" [size]="18" /></button>
+              </div>
+              <app-field-error [server]="errors()['barcode']" />
+            </div>
+            @if (scanning()) {
+              <app-barcode-scanner title="Scan the item's barcode" (scanned)="form.controls.barcode.setValue($event); form.markAsDirty()" (closed)="scanning.set(false)" />
+            }
             <div class="field">
               <label for="unit">Unit</label>
               <select id="unit" class="select" formControlName="unit">
@@ -139,7 +154,9 @@ export class ItemForm implements OnInit {
     reorder_level: [0],
     is_active: [true],
     image: [null as string | null],
+    barcode: [''],
   });
+  protected readonly scanning = signal(false);
 
   async pickPhoto(e: Event): Promise<void> {
     const input = e.target as HTMLInputElement;

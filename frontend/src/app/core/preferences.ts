@@ -16,6 +16,8 @@ export interface Preferences {
   line_image_docs: DocumentType[];
   line_image_size: LineImageSize;
   line_image_layout: LineImageLayout;
+  /** Scan barcodes / QR codes (camera or USB scanner) to add items. */
+  barcode_scan: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -24,6 +26,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   line_image_docs: ['estimate'],
   line_image_size: 'm',
   line_image_layout: 'column',
+  barcode_scan: true,
 };
 
 export function preferencesOf(org: Organization | null | undefined): Preferences {

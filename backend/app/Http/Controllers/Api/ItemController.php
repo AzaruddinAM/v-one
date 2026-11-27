@@ -19,6 +19,7 @@ class ItemController extends Controller
         return [
             'name' => ['required', 'string', 'max:150'],
             'sku' => ['nullable', 'string', 'max:60', Tenant::unique('items', 'sku', $item?->id)],
+            'barcode' => ['nullable', 'string', 'max:64', 'regex:/^[!-~]+$/', Tenant::unique('items', 'barcode', $item?->id)],
             'type' => ['required', Rule::in(['goods', 'service'])],
             'unit' => ['nullable', 'string', 'max:20'],
             'hsn_code' => ['nullable', 'string', 'max:20'],
@@ -42,9 +43,9 @@ class ItemController extends Controller
             ->when($request->category, fn ($q, $c) => $q->where('category', $c))
             ->when($request->has('active'), fn ($q) => $q->where('is_active', $request->boolean('active')))
             ->when($request->boolean('low_stock'), fn ($q) => $q->where('track_inventory', true)->whereColumn('stock_on_hand', '<=', 'reorder_level'));
-        $this->search($q, $request->q, ['name', 'sku', 'hsn_code', 'category']);
+        $this->search($q, $request->q, ['name', 'sku', 'barcode', 'hsn_code', 'category']);
         $this->columnFilters($q, $request, [
-            'name' => static::whereAny(['name', 'sku', 'hsn_code']),
+            'name' => static::whereAny(['name', 'sku', 'barcode', 'hsn_code']),
             'type' => ['type', 'eq'],
             'category' => ['category', 'like'],
             'tax' => static::whereRelated('tax', 'name'),
@@ -101,6 +102,17 @@ class ItemController extends Controller
         $item->delete();
 
         return response()->noContent();
+    }
+
+    /** Exact match for a scanned code: the barcode first, then the SKU. Includes the photo, as it is about to go on a line. */
+    public function lookup(Request $request)
+    {
+        $code = trim((string) $request->validate(['code' => ['required', 'string', 'max:64']])['code']);
+        $item = Item::with('tax:id,name,rate')->where('barcode', $code)->first()
+            ?? Item::with('tax:id,name,rate')->where('sku', $code)->first();
+        abort_unless($item, 404, "No item has the code $code.");
+
+        return $item->makeVisible('image');
     }
 
     public function categories()

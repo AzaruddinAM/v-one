@@ -162,6 +162,8 @@ export interface Item {
   id: number;
   name: string;
   sku?: string | null;
+  /** Barcode / QR code printed on the product. */
+  barcode?: string | null;
   type: 'goods' | 'service';
   unit?: string | null;
   hsn_code?: string | null;

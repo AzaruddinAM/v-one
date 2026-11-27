@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
+import { BarcodeScanner, listenForScanner } from '../../shared/barcode-scanner';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormGroup, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -36,7 +37,7 @@ const SEND_STATUS: Record<DocumentType, string> = {
 
 @Component({
   selector: 'app-document-form',
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError, Icon, MoneyPipe, Typeahead],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError, Icon, MoneyPipe, Typeahead, BarcodeScanner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-form.scss',
   template: `
@@ -198,9 +199,17 @@ const SEND_STATUS: Record<DocumentType, string> = {
           </table>
         </div>
         <div class="card__body">
-          <button type="button" class="btn btn--outline btn--sm" (click)="addLine()"><app-icon name="plus" [size]="16" /> Add line</button>
-          @if (errors()['items']; as e) { <small class="field-error" style="margin-left:12px">{{ e }}</small> }
+          <div class="line-tools">
+            <button type="button" class="btn btn--outline btn--sm" (click)="addLine()"><app-icon name="plus" [size]="16" /> Add line</button>
+            @if (prefs().barcode_scan) {
+              <button type="button" class="btn btn--outline btn--sm" (click)="scanning.set(true)" title="Scan barcodes or QR codes with the camera or a USB scanner"><app-icon name="scan" [size]="16" /> Scan items</button>
+            }
+            @if (errors()['items']; as e) { <small class="field-error">{{ e }}</small> }
+          </div>
         </div>
+        @if (scanning()) {
+          <app-barcode-scanner title="Scan items" [continuous]="true" (scanned)="addByCode($event)" (closed)="scanning.set(false)" />
+        }
 
         <div class="card__body bottom">
           <div class="notes">
@@ -254,7 +263,8 @@ export class DocumentForm implements OnInit {
   readonly recurring = input(false);
 
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
-  private readonly prefs = injectPreferences();
+  protected readonly prefs = injectPreferences();
+  protected readonly scanning = signal(false);
   /** Settings → Features → Line item photos is on for this document type. */
   protected readonly lineImages = computed(() => lineImagesFor(this.prefs(), this.docType()));
   protected readonly sendStatus = computed(() => SEND_STATUS[this.docType()]);
@@ -325,7 +335,11 @@ export class DocumentForm implements OnInit {
   protected readonly itemMeta = (i: Item) =>
     (i.track_inventory ? `${i.stock_on_hand} ${i.unit} · ` : '') + (this.priceOf(i) ?? 0).toFixed(2);
 
+  private readonly destroyRef = inject(DestroyRef);
+
   ngOnInit(): void {
+    // A USB / Bluetooth scanner works anywhere on the page (outside text boxes) without opening the scanner.
+    if (this.prefs().barcode_scan && !this.recurring()) this.destroyRef.onDestroy(listenForScanner((code) => this.addByCode(code)));
     const org = this.auth.organization();
     const id = this.id();
     if (id && this.recurring()) {
@@ -376,6 +390,39 @@ export class DocumentForm implements OnInit {
       });
     }
     if (index === this.lines.length - 1) this.addLine();
+  }
+
+  /** A scanned barcode / SKU: one more of an item already on the bill, or a new line. */
+  addByCode(code: string): void {
+    this.api.get<Item>('items/lookup', { code }).subscribe({
+      next: (item) => {
+        const rows = this.lines.controls;
+        const existing = rows.findIndex((l) => l.value.item_id === item.id);
+        if (existing >= 0) {
+          const l = rows[existing];
+          l.patchValue({ quantity: (Number(l.value.quantity) || 0) + 1 });
+          this.toast.success(`${item.name} × ${l.value.quantity}`);
+          return;
+        }
+        let index = rows.findIndex((l) => !l.value.item_id && !l.value.name);
+        if (index < 0) {
+          this.addLine();
+          index = this.lines.length - 1;
+        }
+        this.lines.at(index).patchValue({
+          item_id: item.id,
+          name: item.name,
+          description: item.description ?? '',
+          unit: item.unit ?? '',
+          rate: this.priceOf(item),
+          tax_id: item.tax_id ?? null,
+          image: this.lineImages() ? (item.image ?? null) : null,
+        });
+        if (index === this.lines.length - 1) this.addLine();
+        this.toast.success(`Added ${item.name}`);
+      },
+      error: (e) => this.toast.error(errorMessage(e)),
+    });
   }
 
   async attachImage(index: number, e: Event): Promise<void> {

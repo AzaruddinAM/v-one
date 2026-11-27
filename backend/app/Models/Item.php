@@ -13,7 +13,7 @@ class Item extends Model
 
     protected $fillable = [
         'name', 'sku', 'type', 'unit', 'hsn_code', 'category', 'description', 'sales_price',
-        'purchase_price', 'tax_id', 'track_inventory', 'stock_on_hand', 'reorder_level', 'is_active', 'image',
+        'purchase_price', 'tax_id', 'track_inventory', 'stock_on_hand', 'reorder_level', 'is_active', 'image', 'barcode',
     ];
 
     /** The photo is only sent when one item is opened (GET items/{id}); lists get has_image instead. */

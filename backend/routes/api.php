@@ -59,6 +59,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('contacts', ContactController::class)->middlewareFor('destroy', $canDelete);
 
     Route::get('items/categories', [ItemController::class, 'categories']);
+    Route::get('items/lookup', [ItemController::class, 'lookup']);
     Route::post('items/{item}/adjust-stock', [ItemController::class, 'adjustStock']);
     Route::get('items/{item}/movements', [ItemController::class, 'movements']);
     Route::apiResource('items', ItemController::class)->middlewareFor('destroy', $canDelete);
