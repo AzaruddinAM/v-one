@@ -63,7 +63,7 @@ remote "CORE='$CORE' SITE='$DEPLOY_PATH' SHA='${SHA:0:7}' bash -s" <<'EOF'
 set -euo pipefail
 dir=~/backups/accounts; mkdir -p "$dir"; chmod 700 ~/backups "$dir"
 stamp="$(date +%Y%m%d-%H%M%S)-$SHA"
-env_get() { grep -E "^$1=" "$CORE/.env" | tail -n1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"; }
+env_get() { grep -E "^$1=" "$CORE/.env" | tail -n1 | cut -d= -f2- | tr -d '\r' | sed -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"; }
 cnf=$(mktemp); trap 'rm -f "$cnf"' EXIT; chmod 600 "$cnf"
 printf '[client]\nhost=%s\nport=%s\nuser=%s\npassword="%s"\n' "$(env_get DB_HOST)" "$(env_get DB_PORT)" "$(env_get DB_USERNAME)" "$(env_get DB_PASSWORD)" > "$cnf"
 mysqldump --defaults-extra-file="$cnf" --single-transaction --quick --routines --no-tablespaces "$(env_get DB_DATABASE)" | gzip > "$dir/$stamp.sql.gz"
