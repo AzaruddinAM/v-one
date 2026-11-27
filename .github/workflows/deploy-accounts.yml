@@ -6,7 +6,7 @@
 # Every deploy first backs up the live database and code to ~/backups/accounts/ on the server,
 # then runs `php artisan migrate --force`. Logic lives in deploy/ssh-deploy-accounts.sh.
 #
-# Runs on every push to feature/gemini-ai-assistant, or by hand: Actions → Deploy accounts → Run workflow.
+# The only deploy for VelouraOne. Runs on every push to feature/gemini-ai-assistant, or by hand: Actions → Deploy accounts → Run workflow.
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   SSH_HOST   server IP from hPanel → Advanced → SSH Access

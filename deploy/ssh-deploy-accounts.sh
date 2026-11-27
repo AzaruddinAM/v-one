@@ -71,7 +71,7 @@ trap 'remote "cd $CORE && $PHP_BIN artisan up" || true; rm -f "$KEYFILE"' EXIT
 push --delete \
   --exclude=/.env --exclude=/.env.* --exclude=/storage/ --exclude=/bootstrap/cache/ --exclude=/.htaccess \
   --exclude=/public/storage --exclude=/database/database.sqlite --exclude=/tests/ --exclude=/node_modules/ \
-  --exclude=/.deploy-sha --exclude=/.chatboat-deploy-sha --exclude=/.phpunit.result.cache --exclude=.git \
+  --exclude=/.deploy-sha --exclude=/.phpunit.result.cache --exclude=.git \
   backend/ "$SSH_USER@$SSH_HOST:$CORE/"
 
 echo "▶ 3/4 Migrate"
