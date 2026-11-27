@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Services\Ai\AssistantService;
 use App\Services\Ai\BillImporter;
 use App\Services\Ai\BillScanner;
+use App\Models\Document;
 use App\Services\Ai\GeminiClient;
+use App\Services\Ai\VoiceLineParser;
 use App\Support\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -99,6 +101,18 @@ class AiController extends Controller
         abort_if(! $messages || end($messages)['role'] !== 'user', 422, 'The last message must be from the user.');
 
         return $assistant->chat($request->user()->load('organization'), $messages);
+    }
+
+    /** Voice input: what the user said → lines for the open invoice / bill / estimate (nothing is saved). */
+    public function parseLines(Request $request, VoiceLineParser $parser)
+    {
+        $this->allowTimeForGemini();
+        $data = $request->validate([
+            'text' => ['required', 'string', 'max:2000'],
+            'type' => ['required', Rule::in(Document::TYPES)],
+        ]);
+
+        return $parser->parse($data['text'], $data['type']);
     }
 
     /** Shared hosts often stop PHP after 30s; Gemini calls get their own time budget (services.gemini.deadline). */

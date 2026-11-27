@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { BarcodeScanner, listenForScanner } from '../../shared/barcode-scanner';
+import { VoiceInput, VoiceResult } from '../../shared/voice-input';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormGroup, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -37,7 +38,7 @@ const SEND_STATUS: Record<DocumentType, string> = {
 
 @Component({
   selector: 'app-document-form',
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError, Icon, MoneyPipe, Typeahead, BarcodeScanner],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, FieldError, Icon, MoneyPipe, Typeahead, BarcodeScanner, VoiceInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-form.scss',
   template: `
@@ -204,9 +205,15 @@ const SEND_STATUS: Record<DocumentType, string> = {
             @if (prefs().barcode_scan) {
               <button type="button" class="btn btn--outline btn--sm" (click)="scanning.set(true)" title="Scan barcodes or QR codes with the camera or a USB scanner"><app-icon name="scan" [size]="16" /> Scan items</button>
             }
+            @if (prefs().voice_input) {
+              <button type="button" class="btn btn--outline btn--sm" (click)="speaking.set(true)" title="Say the items in English, Malayalam or Arabic"><app-icon name="mic" [size]="16" /> Speak items</button>
+            }
             @if (errors()['items']; as e) { <small class="field-error">{{ e }}</small> }
           </div>
         </div>
+        @if (speaking()) {
+          <app-voice-input [docType]="docType()" (parsed)="addSpoken($event)" (failed)="toast.error($event)" (closed)="speaking.set(false)" />
+        }
         @if (scanning()) {
           <app-barcode-scanner title="Scan items" [continuous]="true" (scanned)="addByCode($event)" (closed)="scanning.set(false)" />
         }
@@ -250,7 +257,7 @@ const SEND_STATUS: Record<DocumentType, string> = {
 export class DocumentForm implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastService);
+  protected readonly toast = inject(ToastService);
   private readonly fb = inject(NonNullableFormBuilder);
   protected readonly auth = inject(AuthStore);
   protected readonly lookups = inject(LookupsStore);
@@ -265,6 +272,7 @@ export class DocumentForm implements OnInit {
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
   protected readonly prefs = injectPreferences();
   protected readonly scanning = signal(false);
+  protected readonly speaking = signal(false);
   /** Settings → Features → Line item photos is on for this document type. */
   protected readonly lineImages = computed(() => lineImagesFor(this.prefs(), this.docType()));
   protected readonly sendStatus = computed(() => SEND_STATUS[this.docType()]);
@@ -390,6 +398,29 @@ export class DocumentForm implements OnInit {
       });
     }
     if (index === this.lines.length - 1) this.addLine();
+  }
+
+  /** Lines (and maybe the customer) understood from speech. Unknown items stay as typed lines to check. */
+  addSpoken(r: VoiceResult): void {
+    this.speaking.set(false);
+    if (r.contact && !this.form.controls.contact_id.value) this.pickContact(r.contact as Contact);
+    // Drop the empty trailing line(s), append the spoken ones, then keep one empty line at the end.
+    for (let i = this.lines.length - 1; i >= 0 && this.lines.length > 0; i--) {
+      const l = this.lines.at(i).getRawValue();
+      if (!l.item_id && !l.name && !l.rate) this.lines.removeAt(i);
+      else break;
+    }
+    for (const l of r.lines) {
+      const group = this.newLine({ ...l, description: l.description ?? '', unit: l.unit ?? '', discount_percent: 0, image: null });
+      this.lines.push(group);
+      if (l.item_id && l.has_image && this.lineImages()) {
+        this.api.get<Item>(`items/${l.item_id}`).subscribe((full) => group.patchValue({ image: full.image ?? null }));
+      }
+    }
+    this.addLine();
+    const unknown = r.lines.filter((l) => !l.matched).length;
+    const who = r.contact_name && !r.contact ? ` No ${this.cfg().contactType} called "${r.contact_name}" was found.` : '';
+    this.toast.success(`Added ${r.lines.length} line(s)` + (unknown ? `, ${unknown} not in your items: check name and rate.` : '.') + who);
   }
 
   /** A scanned barcode / SKU: one more of an item already on the bill, or a new line. */

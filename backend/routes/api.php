@@ -96,6 +96,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::post('scan-bill', 'scanBill')->middleware('throttle:ai');
         Route::post('import-bill', 'importBill');
         Route::post('chat', 'chat')->middleware('throttle:ai');
+        Route::post('parse-lines', 'parseLines')->middleware('throttle:ai');
     });
 
     Route::prefix('reports')->controller(ReportController::class)->group(function () {

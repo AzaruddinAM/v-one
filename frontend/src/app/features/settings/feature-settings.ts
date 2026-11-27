@@ -94,6 +94,22 @@ import { errorMessage } from '../../core/utils/http-error';
         </p>
       </div>
     </fieldset>
+
+    <fieldset class="card" [disabled]="!auth.isAdmin() || saving()">
+      <div class="card__header">
+        <div>
+          <h2>Voice input</h2>
+          <p class="muted">Say the items in English, Malayalam or Arabic, for example "2 LED strips at 50 and one driver".</p>
+        </div>
+      </div>
+      <div class="card__body">
+        <label class="checkbox">
+          <input type="checkbox" [checked]="prefs().voice_input" (change)="save({ voice_input: $any($event.target).checked })" />
+          "Speak items" button on invoices, bills, estimates and orders
+        </label>
+        <p class="muted small">Works in Chrome, Edge and Safari. The words are shown so you can correct them, then the AI assistant turns them into lines matched to your items (and finds the customer if you name one). Without the AI key, simple English like "3 fans at 1200" still works.</p>
+      </div>
+    </fieldset>
   `,
   styles: `
     fieldset.card { border: 1px solid var(--border); padding: 0; margin: 0 0 16px; min-width: 0; }

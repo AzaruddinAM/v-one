@@ -63,6 +63,7 @@ class Organization extends Model
             'line_image_size' => ['sometimes', 'in:s,m,l'],
             'line_image_layout' => ['sometimes', 'in:column,below,gallery'],
             'barcode_scan' => ['sometimes', 'boolean'],
+            'voice_input' => ['sometimes', 'boolean'],
         ];
     }
 
