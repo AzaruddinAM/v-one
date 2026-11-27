@@ -1,6 +1,10 @@
 .head {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.lines .table {
+  /* Keep Qty/Rate/Tax usable on phones; the wrapper scrolls sideways instead. */
+  min-width: 860px;
+}
 .lines .table td {
   vertical-align: top;
   padding: 10px 8px;
