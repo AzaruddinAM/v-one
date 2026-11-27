@@ -14,6 +14,7 @@ import { PageHeader } from '../../shared/page-header';
       <a routerLink="taxes" routerLinkActive="is-active">Taxes</a>
       <a routerLink="numbering" routerLinkActive="is-active">Transaction numbers</a>
       <a routerLink="pdf" routerLinkActive="is-active">PDF templates</a>
+      <a routerLink="locking" routerLinkActive="is-active">Transaction locking</a>
       @if (auth.isAdmin()) { <a routerLink="users" routerLinkActive="is-active">Users & roles</a> }
       <a routerLink="profile" routerLinkActive="is-active">My profile</a>
     </nav>

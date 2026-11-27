@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\RespectsLockDate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,14 +11,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Document extends Model
 {
-    use BelongsToOrganization, HasFactory;
+    use BelongsToOrganization, HasFactory, RespectsLockDate;
 
-    public const TYPES = ['estimate', 'sales_order', 'delivery_challan', 'invoice', 'credit_note', 'purchase_order', 'bill', 'vendor_credit'];
+    /** Payment-driven / housekeeping columns that may change inside a locked period. */
+    protected array $lockIgnored = ['status', 'amount_paid', 'balance', 'reminded_at', 'reminder_count'];
 
-    public const SALES = ['estimate', 'sales_order', 'delivery_challan', 'invoice', 'credit_note'];
+    public const TYPES = ['estimate', 'sales_order', 'delivery_challan', 'retainer_invoice', 'invoice', 'credit_note', 'purchase_order', 'bill', 'vendor_credit'];
+
+    public const SALES = ['estimate', 'sales_order', 'delivery_challan', 'retainer_invoice', 'invoice', 'credit_note'];
 
     public const PREFIX = [
-        'estimate' => 'EST-', 'sales_order' => 'SO-', 'delivery_challan' => 'DC-', 'invoice' => 'INV-',
+        'estimate' => 'EST-', 'sales_order' => 'SO-', 'delivery_challan' => 'DC-', 'retainer_invoice' => 'RET-', 'invoice' => 'INV-',
         'credit_note' => 'CN-', 'purchase_order' => 'PO-', 'bill' => 'BILL-', 'vendor_credit' => 'VC-',
     ];
 
@@ -32,6 +36,7 @@ class Document extends Model
         'estimate' => ['draft', 'sent', 'accepted', 'declined'],
         'sales_order' => ['draft', 'open', 'closed', 'void'],
         'delivery_challan' => ['draft', 'open', 'delivered', 'returned', 'void'],
+        'retainer_invoice' => ['draft', 'sent', 'void'],
         'invoice' => ['draft', 'sent', 'void'],
         'credit_note' => ['draft', 'open', 'void'],
         'purchase_order' => ['draft', 'open', 'closed', 'void'],
@@ -97,7 +102,7 @@ class Document extends Model
 
     public function isPayable(): bool
     {
-        return in_array($this->type, ['invoice', 'bill'], true);
+        return in_array($this->type, ['invoice', 'bill', 'retainer_invoice'], true);
     }
 
     public function isSales(): bool

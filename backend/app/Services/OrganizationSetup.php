@@ -69,6 +69,10 @@ class OrganizationSetup
             (clone $taxes)->where('type', 'GST')->update(['is_active' => true, 'updated_at' => $now]);
             (clone $taxes)->whereIn('type', ['VAT', 'EXEMPT'])->update(['is_active' => false, 'updated_at' => $now]);
         }
+        // Keep the default tax liability account's name in step with the tax system.
+        [$from, $to] = $org->tax_regime === 'vat' ? ['GST Payable', 'VAT Payable'] : ['VAT Payable', 'GST Payable'];
+        DB::table('accounts')->where('organization_id', $org->id)->where('sub_type', 'tax')->where('name', $from)
+            ->update(['name' => $to, 'updated_at' => $now]);
     }
 
     private function insertGst(Organization $org): void

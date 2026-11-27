@@ -24,6 +24,7 @@ const SEND_STATUS: Record<DocumentType, string> = {
   estimate: 'sent',
   sales_order: 'open',
   delivery_challan: 'open',
+  retainer_invoice: 'sent',
   vendor_credit: 'open',
   invoice: 'sent',
   credit_note: 'open',

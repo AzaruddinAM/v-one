@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Journal;
 use App\Services\NumberGenerator;
+use App\Support\LockDate;
 use App\Support\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,8 @@ class JournalController extends Controller
 
     private function persist(array $data, ?Journal $journal = null): Journal
     {
+        LockDate::assertOpen($journal?->date, $data['date']);
+
         return DB::transaction(function () use ($data, $journal) {
             $lines = $data['lines'];
             unset($data['lines']);

@@ -16,6 +16,13 @@ class DocumentService
     public function save(array $data, ?Document $document = null): Document
     {
         return DB::transaction(function () use ($data, $document) {
+            if (($data['type'] ?? $document?->type) === 'retainer_invoice') {
+                // An advance is not a supply yet: tax is charged on the final invoice it is applied to.
+                foreach ($data['items'] as &$l) {
+                    $l['tax_id'] = null;
+                }
+                unset($l);
+            }
             $taxRates = Tax::whereIn('id', collect($data['items'])->pluck('tax_id')->filter()->unique())
                 ->pluck('rate', 'id');
 
@@ -72,7 +79,7 @@ class DocumentService
         $document->balance = $document->isPayable() ? round(max(0, $document->total - $paid), 2) : 0;
 
         if ($document->isPayable() && ! in_array($document->status, ['draft', 'void'], true)) {
-            $base = $document->type === 'invoice' ? 'sent' : 'open';
+            $base = in_array($document->type, ['invoice', 'retainer_invoice'], true) ? 'sent' : 'open';
             if ($document->total > 0 && $document->balance <= 0) {
                 $document->status = 'paid';
             } elseif ($paid > 0) {

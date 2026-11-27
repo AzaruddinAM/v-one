@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AiController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BankingController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ExpenseController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Api\OrganizationController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\RecurringProfileController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RetainerController;
 use App\Http\Controllers\Api\TaxController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +36,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
     Route::get('/organization', [OrganizationController::class, 'show']);
     Route::put('/organization', [OrganizationController::class, 'update'])->middleware('role:admin');
+    Route::put('/organization/lock-date', [OrganizationController::class, 'lockDate'])->middleware('role:admin');
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/users', [UserController::class, 'index']);
@@ -62,6 +65,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::post('recurring-profiles/run', [RecurringProfileController::class, 'run']);
     Route::post('recurring-profiles/{recurring_profile}/status', [RecurringProfileController::class, 'status']);
     Route::apiResource('recurring-profiles', RecurringProfileController::class)->middlewareFor('destroy', $canDelete);
+    Route::get('documents/{document}/retainer', [RetainerController::class, 'show']);
+    Route::post('documents/{document}/apply-retainer', [RetainerController::class, 'apply']);
     Route::post('documents/{document}/status', [DocumentController::class, 'status']);
     Route::post('documents/{document}/convert', [DocumentController::class, 'convert']);
     Route::apiResource('documents', DocumentController::class)->middlewareFor('destroy', $canDelete);
@@ -69,6 +74,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::apiResource('payments', PaymentController::class)->except('update')->middlewareFor('destroy', $canDelete);
     Route::apiResource('expenses', ExpenseController::class)->middlewareFor('destroy', $canDelete);
     Route::apiResource('journals', JournalController::class)->middleware($canDelete);
+
+    Route::prefix('banking')->controller(BankingController::class)->group(function () use ($canDelete) {
+        Route::get('accounts', 'index');
+        Route::get('accounts/{account}/transactions', 'transactions');
+        Route::get('accounts/{account}/reconciliations', 'reconciliations');
+        Route::post('accounts/{account}/reconcile', 'reconcile')->middleware($canDelete);
+        Route::delete('reconciliations/{reconciliation}', 'undo')->middleware($canDelete);
+    });
 
     Route::prefix('ai')->controller(AiController::class)->group(function () {
         Route::get('status', 'status');
@@ -88,5 +101,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
         Route::get('tax-summary', 'taxSummary');
         Route::get('vat-return', 'vatReturn');
         Route::get('inventory', 'inventory');
+        Route::get('trial-balance', 'trialBalance');
+        Route::get('general-ledger', 'generalLedger');
+        Route::get('day-book', 'dayBook');
+        Route::get('customer-balances', 'customerBalances');
+        Route::get('vendor-balances', 'vendorBalances');
     });
 });

@@ -109,6 +109,7 @@ export class Shell {
         { label: 'Estimates', icon: 'estimate', link: '/sales/estimates' },
         { label: 'Sales Orders', icon: 'cart', link: '/sales/orders' },
         { label: 'Delivery Challans', icon: 'truck', link: '/sales/delivery-challans' },
+        { label: 'Retainer Invoices', icon: 'coins', link: '/sales/retainer-invoices' },
         { label: 'Invoices', icon: 'invoice', link: '/sales/invoices' },
         { label: 'Recurring Invoices', icon: 'repeat', link: '/sales/recurring-invoices' },
         { label: 'Payments Received', icon: 'card', link: '/payments/received' },
@@ -128,6 +129,7 @@ export class Shell {
         { label: 'Expenses', icon: 'wallet', link: '/expenses' },
       ],
     },
+    { title: 'Banking', items: [{ label: 'Banking', icon: 'bank', link: '/banking' }] },
     {
       title: 'Accountant',
       items: [

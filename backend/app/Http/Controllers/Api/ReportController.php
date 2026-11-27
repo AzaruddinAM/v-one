@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\LedgerService;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    public function __construct(private ReportService $reports) {}
+    public function __construct(private ReportService $reports, private LedgerService $ledger) {}
 
     private function period(Request $request): array
     {
@@ -67,5 +68,39 @@ class ReportController extends Controller
     public function inventory()
     {
         return $this->reports->inventoryValuation();
+    }
+
+    private function asOf(Request $request): string
+    {
+        $request->validate(['as_of' => ['nullable', 'date']]);
+
+        return $request->as_of ?: today()->toDateString();
+    }
+
+    public function trialBalance(Request $request)
+    {
+        return $this->ledger->trialBalance($this->asOf($request));
+    }
+
+    public function generalLedger(Request $request)
+    {
+        $request->validate(['account_id' => ['nullable', 'integer']]);
+
+        return $this->ledger->generalLedger(...[...$this->period($request), $request->integer('account_id') ?: null]);
+    }
+
+    public function dayBook(Request $request)
+    {
+        return $this->ledger->dayBook(...$this->period($request));
+    }
+
+    public function customerBalances(Request $request)
+    {
+        return $this->ledger->contactBalances('customer', $this->asOf($request));
+    }
+
+    public function vendorBalances(Request $request)
+    {
+        return $this->ledger->contactBalances('vendor', $this->asOf($request));
     }
 }

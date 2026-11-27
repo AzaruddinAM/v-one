@@ -98,4 +98,14 @@ class OrganizationController extends Controller
 
         return $org->fresh();
     }
+
+    /** Transactions dated on or before the lock date cannot be created, edited or deleted. */
+    public function lockDate(Request $request)
+    {
+        $data = $request->validate(['lock_date' => ['nullable', 'date', 'before_or_equal:today']]);
+        $org = $request->user()->organization;
+        $org->update(['lock_date' => $data['lock_date'] ?? null]);
+
+        return $org->fresh();
+    }
 }

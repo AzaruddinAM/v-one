@@ -58,7 +58,7 @@ class ReportService
         $salesMonth = (float) $this->between($this->live('invoice'), $monthStart, $todayStr)->sum('total');
         $expenseMonth = (float) Expense::whereBetween('date', [$monthStart, $todayStr])->sum('total')
             + (float) $this->between($this->live('bill'), $monthStart, $todayStr)->sum('total');
-        $receivedMonth = (float) Payment::where('direction', 'in')->whereBetween('date', [$monthStart, $todayStr])->sum('amount');
+        $receivedMonth = (float) Payment::where('direction', 'in')->where('mode', '!=', Payment::RETAINER)->whereBetween('date', [$monthStart, $todayStr])->sum('amount');
 
         // Last 12 months trend — grouped in PHP for MySQL / SQLite portability.
         $start = $today->copy()->subMonths(11)->startOfMonth();
@@ -167,7 +167,7 @@ class ReportService
 
         $cashAccounts = $accounts->filter(fn ($a) => in_array($a->sub_type, ['cash', 'bank'], true));
         $cash = $cashAccounts->sum('opening_balance')
-            + (float) $upTo(Payment::where('direction', 'in'))->sum('amount')
+            + (float) $upTo(Payment::where('direction', 'in')->where('mode', '!=', Payment::RETAINER))->sum('amount')
             - (float) $upTo(Payment::where('direction', 'out'))->sum('amount')
             - (float) $upTo(Expense::query())->sum('total')
             + collect($journal)->only($cashAccounts->keys()->all())->sum();
@@ -180,6 +180,9 @@ class ReportService
         $payable = (float) $upTo($this->live('bill'))->sum('balance')
             - (float) $upTo($this->live('vendor_credit'))->where('status', 'open')->sum('total');
         $outputTax = (float) $upTo($this->live('invoice'))->sum('tax_total') - (float) $upTo($this->live('credit_note'))->sum('tax_total');
+        // Retainer receipts are held as customer advances until applied to an invoice.
+        $advances = (float) $upTo(Payment::where('direction', 'in')->whereHas('document', fn ($d) => $d->where('type', 'retainer_invoice')))->sum('amount')
+            - (float) $upTo(Payment::where('mode', Payment::RETAINER))->sum('amount');
 
         $assets = [
             ['name' => 'Cash & Bank', 'amount' => round($cash, 2)],
@@ -191,9 +194,12 @@ class ReportService
             ['name' => 'Accounts Payable', 'amount' => round($payable, 2)],
             ['name' => 'Tax Payable', 'amount' => round($outputTax, 2)],
         ];
+        if (abs($advances) >= 0.005) {
+            $liabilities[] = ['name' => 'Customer Advances', 'amount' => round($advances, 2)];
+        }
         $equity = [];
 
-        $handled = ['cash', 'bank', 'receivable', 'payable', 'inventory', 'tax'];
+        $handled = ['cash', 'bank', 'receivable', 'payable', 'inventory', 'tax', 'advance'];
         foreach ($accounts as $id => $a) {
             if (in_array($a->sub_type, $handled, true) || in_array($a->type, ['income', 'expense'], true)) {
                 continue;
@@ -415,8 +421,9 @@ class ReportService
         $creditType = $isCustomer ? 'credit_note' : 'vendor_credit';
         $this->between($this->live($creditType), $from, $to)->where('contact_id', $contact->id)->get()
             ->each(fn ($d) => $entries->push(['date' => $d->date->toDateString(), 'type' => $creditType, 'number' => $d->number, 'debit' => 0, 'credit' => $d->total]));
-        Payment::where('contact_id', $contact->id)->whereBetween('date', [$from, $to])->get()
-            ->each(fn ($p) => $entries->push(['date' => $p->date->toDateString(), 'type' => 'payment', 'number' => $p->number, 'debit' => 0, 'credit' => $p->amount]));
+        Payment::where('contact_id', $contact->id)->whereBetween('date', [$from, $to])
+            ->whereDoesntHave('document', fn ($d) => $d->where('type', 'retainer_invoice'))->get()
+            ->each(fn ($p) => $entries->push(['date' => $p->date->toDateString(), 'type' => $p->mode === Payment::RETAINER ? 'retainer_applied' : 'payment', 'number' => $p->number, 'debit' => 0, 'credit' => $p->amount]));
 
         $balance = $contact->opening_balance;
         $rows = $entries->sortBy('date')->values()->map(function ($e) use (&$balance) {

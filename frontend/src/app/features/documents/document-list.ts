@@ -21,6 +21,7 @@ const STATUS_TABS: Record<DocumentType, string[]> = {
   estimate: ['draft', 'sent', 'accepted', 'declined'],
   sales_order: ['draft', 'open', 'closed', 'void'],
   delivery_challan: ['draft', 'open', 'delivered', 'invoiced', 'returned', 'void'],
+  retainer_invoice: ['draft', 'sent', 'partial', 'paid', 'void'],
   invoice: ['draft', 'sent', 'partial', 'overdue', 'paid', 'void'],
   credit_note: ['draft', 'open', 'void'],
   purchase_order: ['draft', 'open', 'closed', 'void'],

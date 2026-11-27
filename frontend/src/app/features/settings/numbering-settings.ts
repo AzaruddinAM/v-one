@@ -14,7 +14,7 @@ interface Row extends NumberSeries {
   custom: boolean;
 }
 
-const ORDER: DocumentType[] = ['invoice', 'estimate', 'sales_order', 'delivery_challan', 'credit_note', 'purchase_order', 'bill', 'vendor_credit'];
+const ORDER: DocumentType[] = ['invoice', 'estimate', 'sales_order', 'delivery_challan', 'retainer_invoice', 'credit_note', 'purchase_order', 'bill', 'vendor_credit'];
 
 /** Settings → Transaction numbers: Zoho-style prefixes with placeholders and a running number. */
 @Component({
@@ -121,7 +121,7 @@ export class NumberingSettings implements OnInit {
 }
 
 const PREFIX: Record<DocumentType, string> = {
-  estimate: 'EST-', sales_order: 'SO-', delivery_challan: 'DC-', invoice: 'INV-', credit_note: 'CN-', purchase_order: 'PO-', bill: 'BILL-', vendor_credit: 'VC-',
+  estimate: 'EST-', sales_order: 'SO-', delivery_challan: 'DC-', retainer_invoice: 'RET-', invoice: 'INV-', credit_note: 'CN-', purchase_order: 'PO-', bill: 'BILL-', vendor_credit: 'VC-',
 };
 
 function defaultPrefix(type: DocumentType): string {

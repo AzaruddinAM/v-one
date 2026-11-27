@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
@@ -8,6 +9,7 @@ import { fiscalYearStart, isoDate } from '../../core/utils/dates';
 import { errorMessage } from '../../core/utils/http-error';
 import { Icon } from '../../shared/icon';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { DOC_CONFIG } from '../../core/documents.config';
 import { REPORTS } from './reports.config';
 
 type Row = Record<string, unknown>;
@@ -16,12 +18,19 @@ interface Column {
   label: string;
   money?: boolean;
   num?: boolean;
+  /** Leave the cell empty instead of showing 0.00 (debit / credit columns). */
+  blankZero?: boolean;
 }
+
+const SOURCE_LABEL: Record<string, string> = {
+  opening: 'Opening balance', payment: 'Payment', expense: 'Expense', journal: 'Journal',
+  invoice: 'Invoice', credit_note: 'Credit note', bill: 'Bill', vendor_credit: 'Vendor credit',
+};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 @Component({
   selector: 'app-report-view',
-  imports: [FormsModule, RouterLink, Icon, MoneyPipe],
+  imports: [DatePipe, FormsModule, RouterLink, Icon, MoneyPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="bar no-print">
@@ -141,6 +150,62 @@ interface Column {
             </div>
             @if (d.expense_tax) { <p class="muted mt-1">Includes {{ d.expense_tax | money }} tax paid on expenses in input credit.</p> }
           }
+          @case ('general-ledger') {
+            <div class="gl-filter no-print">
+              <select class="select input--sm" [ngModel]="glAccount()" (ngModelChange)="glAccount.set($event)">
+                <option [ngValue]="0">All accounts</option>
+                @for (a of d.accounts; track a.account_id) { <option [ngValue]="a.account_id">{{ a.code }} · {{ a.name }}</option> }
+              </select>
+            </div>
+            @for (a of glAccounts(); track a.account_id) {
+              <table class="table statement gl">
+                <thead>
+                  <tr class="section"><td colspan="6">{{ a.code }} · {{ a.name }}</td></tr>
+                  <tr><th>Date</th><th>Transaction</th><th>Details</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th class="text-right">Balance</th></tr>
+                </thead>
+                <tbody>
+                  <tr class="muted"><td colspan="5">Opening balance</td><td class="text-right mono">{{ dc(a.opening) }}</td></tr>
+                  @for (r of a.rows; track $index) {
+                    <tr>
+                      <td class="nowrap">{{ r.date | date: 'dd MMM yyyy' }}</td>
+                      <td>@if (srcLink(r); as l) { <a [routerLink]="l">{{ srcLabel(r) }}</a> } @else { {{ srcLabel(r) }} }</td>
+                      <td>{{ r.contact || r.description || '' }}</td>
+                      <td class="text-right mono">{{ r.debit ? (r.debit | money) : '' }}</td>
+                      <td class="text-right mono">{{ r.credit ? (r.credit | money) : '' }}</td>
+                      <td class="text-right mono">{{ dc(r.balance) }}</td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot><tr class="subtotal"><td colspan="3">Closing balance</td><td class="text-right mono">{{ a.debit | money }}</td><td class="text-right mono">{{ a.credit | money }}</td><td class="text-right mono">{{ dc(a.closing) }}</td></tr></tfoot>
+              </table>
+            } @empty { <p class="muted text-center">No postings for this period.</p> }
+          }
+          @case ('day-book') {
+            <table class="table statement">
+              <thead><tr><th>Date</th><th>Transaction</th><th>Account</th><th class="text-right">Debit</th><th class="text-right">Credit</th></tr></thead>
+              @for (t of d.transactions; track $index) {
+                <tbody class="tx">
+                  @for (l of t.lines; track $index; let first = $first) {
+                    <tr>
+                      <td class="nowrap">{{ first ? (t.date | date: 'dd MMM yyyy') : '' }}</td>
+                      <td>
+                        @if (first) {
+                          @if (srcLink(t); as lk) { <a [routerLink]="lk">{{ srcLabel(t) }}</a> } @else { {{ srcLabel(t) }} }
+                          @if (t.contact) { <div class="muted small">{{ t.contact }}</div> }
+                        }
+                      </td>
+                      <td [class.indent]="!l.debit">{{ l.account }}</td>
+                      <td class="text-right mono">{{ l.debit ? (l.debit | money) : '' }}</td>
+                      <td class="text-right mono">{{ l.credit ? (l.credit | money) : '' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              } @empty { <tbody><tr><td colspan="5" class="muted text-center">No transactions for this period.</td></tr></tbody> }
+              @if (d.transactions.length) {
+                <tfoot><tr class="subtotal"><td colspan="3">{{ d.transactions.length }} transactions</td><td class="text-right mono">{{ d.total | money }}</td><td class="text-right mono">{{ d.total | money }}</td></tr></tfoot>
+              }
+            </table>
+          }
           @default {
             <div class="table-wrap">
               <table class="table">
@@ -150,7 +215,7 @@ interface Column {
                     <tr>
                       @for (c of columns(); track c.key) {
                         <td [class.text-right]="c.money || c.num" [class.mono]="c.money || c.num" [class.text-danger]="c.key === 'name' && r['low']">
-                          {{ c.money ? (asNum(r[c.key]) | money) : r[c.key] }}
+                          {{ c.money ? (c.blankZero && !asNum(r[c.key]) ? '' : (asNum(r[c.key]) | money)) : r[c.key] }}
                         </td>
                       }
                     </tr>
@@ -182,6 +247,12 @@ interface Column {
     .tax { padding: 0 20px; }
     .tax-tables { padding: 20px; }
     .tax-tables h3 { margin-bottom: 8px; }
+    .gl-filter { padding: 0 20px 12px; display: flex; justify-content: flex-end; }
+    .gl-filter .select { width: auto; }
+    .gl { margin-bottom: 18px; }
+    .tx tr:last-child td { border-bottom: 1px solid var(--border); }
+    .small { font-size: 12px; }
+    .nowrap { white-space: nowrap; }
   `,
 })
 export class ReportView {
@@ -232,6 +303,25 @@ export class ReportView {
           { key: 'average_price', label: 'Avg price', money: true },
           { key: 'amount', label: 'Amount', money: true },
         ];
+      case 'trial-balance':
+        return [
+          { key: 'code', label: 'Code' },
+          { key: 'name', label: 'Account' },
+          { key: 'type', label: 'Type' },
+          { key: 'debit', label: 'Debit', money: true, blankZero: true },
+          { key: 'credit', label: 'Credit', money: true, blankZero: true },
+        ];
+      case 'customer-balances':
+      case 'vendor-balances': {
+        const customer = this.report() === 'customer-balances';
+        return [
+          { key: 'name', label: customer ? 'Customer' : 'Vendor' },
+          { key: 'billed', label: customer ? 'Invoiced' : 'Billed', money: true },
+          { key: 'paid', label: customer ? 'Received & credited' : 'Paid & credited', money: true },
+          ...(customer ? [{ key: 'advance', label: 'Unused advance', money: true, blankZero: true }] : []),
+          { key: 'balance', label: 'Balance due', money: true },
+        ];
+      }
       case 'inventory':
         return [
           { key: 'name', label: 'Item' },
@@ -265,6 +355,11 @@ export class ReportView {
         return { name: 'Total', sales: this.sum(r, 'sales'), total: this.sum(r, 'total'), invoices: this.sum(r, 'invoices') };
       case 'sales-by-item':
         return { name: 'Total', amount: this.sum(r, 'amount') };
+      case 'trial-balance':
+        return { name: 'Total', debit: d.total_debit, credit: d.total_credit };
+      case 'customer-balances':
+      case 'vendor-balances':
+        return { name: 'Total', billed: this.sum(r, 'billed'), paid: this.sum(r, 'paid'), advance: d.total_advance, balance: d.total };
       default:
         return null;
     }
@@ -319,6 +414,32 @@ export class ReportView {
     }
   }
 
+  /** General ledger account filter (0 = all). */
+  protected readonly glAccount = signal(0);
+  protected readonly glAccounts = computed<any[]>(() => {
+    const all = this.data()?.accounts ?? [];
+    return this.glAccount() ? all.filter((a: any) => a.account_id === this.glAccount()) : all;
+  });
+
+  protected srcLabel(e: { source: string; number?: string }): string {
+    const label = SOURCE_LABEL[e.source] ?? e.source;
+    return e.number ? `${label} ${e.number}` : label;
+  }
+
+  protected srcLink(e: { source: string; source_id: number }): string[] | null {
+    const cfg = DOC_CONFIG[e.source as keyof typeof DOC_CONFIG];
+    if (cfg) return [cfg.path, String(e.source_id)];
+    if (e.source === 'journal') return ['/accounting/journals', String(e.source_id), 'edit'];
+    return null;
+  }
+
+  /** Balance with Dr / Cr suffix, as accountants read it. */
+  protected dc(v: number): string {
+    if (Math.abs(v) < 0.005) return '0.00';
+    const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${s} ${v > 0 ? 'Dr' : 'Cr'}`;
+  }
+
   protected asNum(v: unknown): number {
     return Number(v) || 0;
   }
@@ -346,11 +467,23 @@ export class ReportView {
         ['12', 'Totals', d.expenses_total.amount, d.expenses_total.vat],
         ['14', 'Payable tax for the period', '', d.net_vat],
       ];
+    } else if (this.report() === 'general-ledger') {
+      lines = [['Account', 'Date', 'Transaction', 'Details', 'Debit', 'Credit', 'Balance']];
+      for (const a of this.glAccounts()) {
+        lines.push([`${a.code} ${a.name}`, '', 'Opening balance', '', '', '', a.opening]);
+        for (const r of a.rows) lines.push([`${a.code} ${a.name}`, r.date, this.srcLabel(r), r.contact || r.description || '', r.debit, r.credit, r.balance]);
+        lines.push([`${a.code} ${a.name}`, '', 'Closing balance', '', a.debit, a.credit, a.closing]);
+      }
+    } else if (this.report() === 'day-book') {
+      lines = [['Date', 'Transaction', 'Contact', 'Account', 'Debit', 'Credit']];
+      for (const t of d.transactions) for (const l of t.lines) lines.push([t.date, this.srcLabel(t), t.contact || '', l.account, l.debit, l.credit]);
     } else if (this.report() === 'tax-summary') {
       lines = [['Type', 'Rate', 'Taxable', 'Tax'], ...d.output.map((r: any) => ['Output', r.rate, r.taxable, r.tax]), ...d.input.map((r: any) => ['Input', r.rate, r.taxable, r.tax]), ['Net payable', '', '', d.net_payable]];
     } else {
       const cols = this.columns();
       lines = [cols.map((c) => c.label), ...this.rows().map((r) => cols.map((c) => String(r[c.key] ?? '')))];
+      const f = this.footer();
+      if (f) lines.push(cols.map((c) => String(f[c.key] ?? '')));
     }
     const csv = lines.map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));

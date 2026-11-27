@@ -32,8 +32,11 @@ v-one/
 | **PDF templates** | Settings → PDF templates with a live preview: Classic, Modern, Minimal or GST Tax Invoice layout; accent colour, font, text size and paper (A4 / Letter / A5); logo upload (left / centre / right, 3 sizes); tagline and custom titles (e.g. QUOTATION); show/hide address, GSTIN, phone, email, item descriptions, discount & tax columns, amount in words, notes, terms, balance, PAID stamp; footer text (bank / UPI), bottom line, signature box with uploaded signature or stamp. Switch template per document from its toolbar, then **PDF / Print → Save as PDF** |
 | **Payments** | Record full/partial payments (cash, bank, UPI, cheque, card) against invoices/bills or as advances; statuses update automatically (sent → partial → paid / overdue) |
 | **Inventory** | Stock moves automatically: invoices & vendor credits reduce, bills & credit notes increase (delivery challans don't move stock); draft/void documents don't touch stock; edits re-sync |
-| **Accountant** | Chart of accounts (25 standard accounts pre-created), manual journals with debit = credit validation |
-| **Reports** | Profit & Loss, Balance Sheet, Receivables & Payables aging, Sales by Customer, Sales by Item, GST/Tax summary, Inventory valuation — date presets, CSV export, print |
+| **Retainer invoices** | Ask for an advance before the work (no tax on the advance). The customer's payment is held as *Customer Advances*; apply it to one or more of their invoices later from the retainer's page |
+| **Banking** | Cash and bank accounts with balances, add bank accounts, transfer money between them, transactions with running balance, **bank reconciliation** (enter statement date and balance, tick cleared items, saves at zero difference; undo the latest) |
+| **Transaction locking** | Settings → Transaction locking: nothing dated on or before the lock date can be added, edited or deleted (admins only); a payment today against an older invoice still works |
+| **Accountant** | Chart of accounts (25 standard accounts pre-created), manual journals with debit = credit validation; a double-entry general ledger is derived from every transaction |
+| **Reports** | Profit & Loss, Balance Sheet, **Trial Balance, General Ledger, Day Book, Customer & Vendor Balances**, Receivables & Payables aging, Sales by Customer, Sales by Item, GST/Tax summary, Inventory valuation — date presets, CSV export, print |
 | **Settings** | Organization profile, currency, financial year, default terms; tax rates; users & roles (admin / accountant / staff); profile & password |
 | **AI (Gemini)** | Scan a bill photo/PDF → review & edit the extracted vendor, items, GST and totals → confirm to save as a bill or expense; ✨ chat assistant that answers from your live data, drafts reminders and supports `/commands`. See [AI-ASSISTANT-GUIDE.md](AI-ASSISTANT-GUIDE.md) |
 | **Multi-tenant** | Every organization's data is isolated automatically (global scope + scoped validation) |
@@ -82,7 +85,7 @@ GEMINI_API_KEY=your-gemini-key     # optional: enables bill scanning + AI chat
 ```
 A unique `APP_KEY` is already filled in.
 
-> **Upgrading an existing database?** Run `database/upgrade-*.sql` files you haven't run yet in phpMyAdmin → SQL (e.g. `upgrade-2026-11-pdf-templates.sql` adds the PDF template columns, then `upgrade-2026-11-billing-features.sql` adds the tax system, number series, recurring profiles and reminder columns).
+> **Upgrading an existing database?** Run `database/upgrade-*.sql` files you haven't run yet in phpMyAdmin → SQL (e.g. `upgrade-2026-11-pdf-templates.sql` adds the PDF template columns, then `upgrade-2026-11-billing-features.sql` adds the tax system, number series, recurring profiles and reminder columns, then `upgrade-2026-11-accounting-features.sql` adds transaction locking, retainer applications and bank reconciliation).
 
 **5. PHP version** — hPanel → *Advanced → PHP Configuration* → **PHP 8.3 or newer** (extensions `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `bcmath` are enabled by default on Hostinger).
 

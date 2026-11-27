@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\RespectsLockDate;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Expense extends Model
 {
-    use BelongsToOrganization, HasFactory;
+    use BelongsToOrganization, HasFactory, RespectsLockDate;
 
     protected $fillable = ['date', 'account_id', 'paid_through_id', 'contact_id', 'amount', 'tax_id', 'tax_amount', 'total', 'reference', 'description'];
 

@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\RespectsLockDate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Journal extends Model
 {
-    use BelongsToOrganization;
+    use BelongsToOrganization, RespectsLockDate;
 
     protected $fillable = ['number', 'date', 'reference', 'notes', 'total'];
 

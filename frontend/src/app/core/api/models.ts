@@ -27,6 +27,8 @@ export interface Organization {
   number_series?: Partial<Record<DocumentType, NumberSeries>> | null;
   /** Payment reminder message with {customer} {invoice} {amount} {due_date} {days} {org} placeholders. */
   reminder_template?: string | null;
+  /** Transactions dated on or before this day cannot be added, edited or deleted. */
+  lock_date?: string | null;
 }
 
 export type TaxRegime = 'gst' | 'vat' | 'none';
@@ -177,6 +179,7 @@ export type DocumentType =
   | 'estimate'
   | 'sales_order'
   | 'delivery_challan'
+  | 'retainer_invoice'
   | 'invoice'
   | 'credit_note'
   | 'purchase_order'
@@ -232,7 +235,8 @@ export interface Document extends DocumentSummary {
   payments?: Payment[];
 }
 
-export type PaymentMode = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'card' | 'other';
+/** 'retainer' marks an advance applied to an invoice (no money moves); it is never chosen by hand. */
+export type PaymentMode = 'cash' | 'bank_transfer' | 'upi' | 'cheque' | 'card' | 'other' | 'retainer';
 
 export interface Payment {
   id: number;
@@ -352,4 +356,62 @@ export interface Dashboard {
 export interface ReportLine {
   name: string;
   amount: number;
+}
+
+export interface RetainerSummary {
+  received: number;
+  applied: number;
+  unapplied: number;
+  applications: { id: number; number: string; date: string; amount: number; document_id: number; document?: { id: number; number: string } | null }[];
+  invoices: { id: number; number: string; date: string; due_date?: string | null; total: number; balance: number }[];
+}
+
+/** One posting of the general ledger (see backend LedgerService). */
+export interface LedgerEntry {
+  date: string | null;
+  account_id: number;
+  debit: number;
+  credit: number;
+  source: string;
+  source_id: number;
+  key: string;
+  number: string;
+  contact_id: number | null;
+  contact: string | null;
+  description: string | null;
+  balance?: number;
+  reconciliation_id?: number | null;
+}
+
+export interface BankAccount {
+  id: number;
+  code: string;
+  name: string;
+  sub_type: 'cash' | 'bank';
+  description?: string | null;
+  is_active: boolean;
+  is_system: boolean;
+  balance: number;
+  uncleared: number;
+  last_reconciled: string | null;
+  reconciled_balance: number | null;
+}
+
+export interface BankTransactions {
+  account: { id: number; code: string; name: string; sub_type: string };
+  opening: number;
+  rows: LedgerEntry[];
+  closing: number;
+  cleared_balance: number;
+}
+
+export interface Reconciliation {
+  id: number;
+  account_id: number;
+  statement_date: string;
+  statement_balance: number;
+  cleared_balance: number;
+  entries_count: number;
+  created_at: string;
+  creator?: { id: number; name: string } | null;
 }

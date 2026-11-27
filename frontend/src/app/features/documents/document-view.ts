@@ -16,10 +16,11 @@ import { MoneyPipe } from '../../shared/money.pipe';
 import { StatusBadge } from '../../shared/status-badge';
 import { PaymentDialog } from '../payments/payment-dialog';
 import { DocumentSheet } from './document-sheet';
+import { RetainerPanel } from './retainer-panel';
 
 @Component({
   selector: 'app-document-view',
-  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog, DocumentSheet],
+  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog, DocumentSheet, RetainerPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-view.scss',
   template: `
@@ -87,6 +88,10 @@ import { DocumentSheet } from './document-sheet';
       }
 
       <app-document-sheet [doc]="d" [org]="org()" [template]="tpl()" [accent]="accent()" [options]="opts()" [footer]="org()?.pdf_footer" />
+
+      @if (d.type === 'retainer_invoice' && d.status !== 'draft' && d.status !== 'void') {
+        <app-retainer-panel [doc]="d" />
+      }
 
       @if (cfg().payable && d.payments?.length) {
         <div class="card mt-2 no-print">

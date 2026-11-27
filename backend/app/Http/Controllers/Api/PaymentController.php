@@ -52,8 +52,8 @@ class PaymentController extends Controller
         return DB::transaction(function () use ($data) {
             if (! empty($data['document_id'])) {
                 $doc = Document::lockForUpdate()->findOrFail($data['document_id']);
-                $expected = $data['direction'] === 'in' ? 'invoice' : 'bill';
-                if ($doc->type !== $expected || (int) $doc->contact_id !== (int) $data['contact_id']) {
+                $expected = $data['direction'] === 'in' ? ['invoice', 'retainer_invoice'] : ['bill'];
+                if (! in_array($doc->type, $expected, true) || (int) $doc->contact_id !== (int) $data['contact_id']) {
                     throw ValidationException::withMessages(['document_id' => 'The document does not match this payment.']);
                 }
                 if (in_array($doc->status, ['draft', 'void'], true)) {
@@ -82,6 +82,12 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment)
     {
+        if ($payment->document?->type === 'retainer_invoice'
+            && Payment::where('retainer_id', $payment->document_id)->exists()
+            && Payment::where('document_id', $payment->document_id)->sum('amount') - $payment->amount
+                < Payment::where('retainer_id', $payment->document_id)->sum('amount') - 0.009) {
+            throw ValidationException::withMessages(['payment' => 'This advance has been applied to invoices. Remove those applications first.']);
+        }
         DB::transaction(function () use ($payment) {
             $doc = $payment->document()->first();
             $payment->delete();
