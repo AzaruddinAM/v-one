@@ -21,8 +21,16 @@ SSH_PORT=${SSH_PORT:-65002}
 SHA=${GITHUB_SHA:-$(git rev-parse HEAD)}
 
 KEYFILE=$(mktemp); trap 'rm -f "$KEYFILE"' EXIT
-printf '%s\n' "$SSH_KEY" > "$KEYFILE"; chmod 600 "$KEYFILE"
-SSH_OPTS=(-i "$KEYFILE" -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=20 -o BatchMode=yes)
+# Secrets pasted from Windows may carry CR characters or surrounding spaces; ssh rejects such keys.
+SSH_HOST=$(printf '%s' "$SSH_HOST" | tr -d '\r[:space:]'); SSH_USER=$(printf '%s' "$SSH_USER" | tr -d '\r[:space:]')
+SSH_PORT=$(printf '%s' "$SSH_PORT" | tr -d '\r[:space:]')
+printf '%s\n' "$SSH_KEY" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' > "$KEYFILE"; chmod 600 "$KEYFILE"
+if ! ssh-keygen -y -f "$KEYFILE" > /dev/null 2>&1; then
+  echo "::error::SSH_KEY is not a valid private key. Paste the whole file, from -----BEGIN OPENSSH PRIVATE KEY----- to -----END OPENSSH PRIVATE KEY-----." >&2; exit 1
+fi
+echo "Key: $(ssh-keygen -l -f "$KEYFILE" | awk '{print $2, $3}') → $SSH_USER@$SSH_HOST:$SSH_PORT"
+SSH_OPTS=(-i "$KEYFILE" -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=20 -o ConnectTimeout=20 -o BatchMode=yes -o IdentitiesOnly=yes)
+ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" true || { echo "::error::SSH login failed for $SSH_USER@$SSH_HOST port $SSH_PORT. Check SSH_HOST, SSH_USER, SSH_PORT and that the public key is added in hPanel → SSH Access." >&2; exit 1; }
 remote() { ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" "$@"; }
 push() { rsync -rlz --checksum --info=stats1 -e "ssh ${SSH_OPTS[*]}" "$@"; }
 
