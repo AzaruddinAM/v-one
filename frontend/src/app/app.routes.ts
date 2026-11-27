@@ -65,6 +65,7 @@ export const routes: Routes = [
           { path: 'organization', loadComponent: () => import('./features/settings/organization-settings').then((m) => m.OrganizationSettings) },
           { path: 'profile', loadComponent: () => import('./features/settings/profile-settings').then((m) => m.ProfileSettings) },
           { path: 'taxes', loadComponent: () => import('./features/settings/tax-settings').then((m) => m.TaxSettings) },
+          { path: 'pdf', loadComponent: () => import('./features/settings/pdf-settings').then((m) => m.PdfSettings) },
           { path: 'users', canActivate: [adminGuard], loadComponent: () => import('./features/settings/user-settings').then((m) => m.UserSettings) },
         ],
       },

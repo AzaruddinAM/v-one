@@ -25,6 +25,7 @@ v-one/
 | **Items** | Goods & services, SKU, HSN/SAC, units, categories, sales & cost price, default tax, inventory tracking, opening stock, reorder level, stock adjustments |
 | **Sales** | Estimates → Sales Orders → Invoices, Credit Notes; auto numbering (INV-00001…), line discounts, document discount, adjustment, live totals, print/PDF-ready tax invoice with CGST/SGST split |
 | **Purchases** | Purchase Orders → Bills, Payments Made, Expenses with tax |
+| **PDF templates** | Settings → PDF templates: pick Classic, Modern, Minimal or GST Tax Invoice layout, an accent colour and a footer (bank details / UPI). Every invoice, estimate and other document prints with amount in words and a signatory box; switch template per document from its toolbar, then **PDF / Print → Save as PDF** |
 | **Payments** | Record full/partial payments (cash, bank, UPI, cheque, card) against invoices/bills or as advances; statuses update automatically (sent → partial → paid / overdue) |
 | **Inventory** | Stock moves automatically: invoices reduce, bills & credit notes increase; draft/void documents don't touch stock; edits re-sync |
 | **Accountant** | Chart of accounts (25 standard accounts pre-created), manual journals with debit = credit validation |
@@ -76,6 +77,8 @@ CORS_ALLOWED_ORIGINS=https://yourdomain.com
 GEMINI_API_KEY=your-gemini-key     # optional: enables bill scanning + AI chat
 ```
 A unique `APP_KEY` is already filled in.
+
+> **Upgrading an existing database?** Run `database/upgrade-*.sql` files you haven't run yet in phpMyAdmin → SQL (e.g. `upgrade-2026-11-pdf-templates.sql` adds the PDF template columns).
 
 **5. PHP version** — hPanel → *Advanced → PHP Configuration* → **PHP 8.3 or newer** (extensions `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `bcmath` are enabled by default on Hostinger).
 

@@ -18,7 +18,12 @@ export interface Organization {
   date_format?: string | null;
   invoice_terms?: string | null;
   invoice_notes?: string | null;
+  pdf_template?: PdfTemplateId | null;
+  pdf_accent?: string | null;
+  pdf_footer?: string | null;
 }
+
+export type PdfTemplateId = 'classic' | 'modern' | 'minimal' | 'gst';
 
 export interface User {
   id: number;

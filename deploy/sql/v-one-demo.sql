@@ -614,7 +614,8 @@ INSERT INTO `migrations` VALUES
 (2,'0001_01_01_000001_create_cache_table',1),
 (3,'0001_01_01_000002_create_jobs_table',1),
 (4,'2019_12_14_000001_create_personal_access_tokens_table',1),
-(5,'2026_01_01_000100_create_accounting_tables',1);
+(5,'2026_01_01_000100_create_accounting_tables',1),
+(6,'2026_11_26_000100_add_pdf_template_to_organizations',1);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 
 --
@@ -642,6 +643,9 @@ CREATE TABLE `organizations` (
   `date_format` varchar(20) NOT NULL DEFAULT 'dd/MM/yyyy',
   `invoice_terms` text DEFAULT NULL,
   `invoice_notes` text DEFAULT NULL,
+  `pdf_template` varchar(20) NOT NULL DEFAULT 'classic',
+  `pdf_accent` varchar(7) NOT NULL DEFAULT '#4f46e5',
+  `pdf_footer` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
@@ -654,7 +658,7 @@ CREATE TABLE `organizations` (
 
 /*!40000 ALTER TABLE `organizations` DISABLE KEYS */;
 INSERT INTO `organizations` VALUES
-(1,'V-One Demo Traders','9876543210','accounts@vone.demo',NULL,'2nd Floor, MG Road','Kasaragod','Kerala','India','671121','32ABCDE1234F1Z5','INR','₹',4,'dd/MM/yyyy','Payment due within the agreed credit period. Thank you for your business!',NULL,'2026-10-27 22:57:28','2026-10-27 22:57:28');
+(1,'V-One Demo Traders','9876543210','accounts@vone.demo',NULL,'2nd Floor, MG Road','Kasaragod','Kerala','India','671121','32ABCDE1234F1Z5','INR','₹',4,'dd/MM/yyyy','Payment due within the agreed credit period. Thank you for your business!',NULL,'classic','#4f46e5',NULL,'2026-10-27 22:57:28','2026-10-27 22:57:28');
 /*!40000 ALTER TABLE `organizations` ENABLE KEYS */;
 
 --

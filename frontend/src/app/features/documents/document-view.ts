@@ -2,9 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, si
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api/api.service';
-import { Document, DocumentType } from '../../core/api/models';
+import { Document, DocumentType, PdfTemplateId } from '../../core/api/models';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG, docPath } from '../../core/documents.config';
+import { amountInWords, orgPdfAccent, orgPdfTemplate, PDF_TEMPLATES } from '../../core/pdf-templates';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
@@ -41,7 +42,13 @@ import { PaymentDialog } from '../payments/payment-dialog';
         @if (d.type === 'estimate' && d.status === 'sent') {
           <button type="button" class="btn btn--outline btn--sm" (click)="setStatus('declined')">Mark declined</button>
         }
-        <button type="button" class="btn btn--outline btn--sm btn--icon" (click)="print()" aria-label="Print"><app-icon name="print" [size]="16" /></button>
+        <label class="tpl-pick" title="PDF template">
+          <span class="sr-only">PDF template</span>
+          <select class="select select--sm" [value]="tpl()" (change)="pickTemplate($event)">
+            @for (t of templates; track t.id) { <option [value]="t.id">{{ t.label }}</option> }
+          </select>
+        </label>
+        <button type="button" class="btn btn--outline btn--sm" (click)="print()" title="Print or save as PDF"><app-icon name="print" [size]="16" /> PDF / Print</button>
         <div class="more">
           <button type="button" class="btn btn--outline btn--sm btn--icon" (click)="menu.set(!menu())" aria-label="More"><app-icon name="chevron-down" [size]="16" /></button>
           @if (menu()) {
@@ -63,12 +70,12 @@ import { PaymentDialog } from '../payments/payment-dialog';
         </div>
       }
 
-      <article class="card sheet">
+      <article class="card sheet" [class]="'tpl-' + tpl()" [style.--accent]="accent()">
         @if (d.status === 'paid') { <div class="ribbon">PAID</div> }
         <header class="sheet__head">
           <div>
             <div class="org-name">{{ org()?.name }}</div>
-            <div class="muted small">
+            <div class="muted small org-meta">
               @if (org()?.address) { {{ org()?.address }}<br /> }
               {{ orgCity() }}
               @if (org()?.gstin) { <br />GSTIN: {{ org()?.gstin }} }
@@ -129,6 +136,10 @@ import { PaymentDialog } from '../payments/payment-dialog';
 
         <section class="sheet__foot">
           <div class="notes">
+            <div class="words">
+              <small class="muted">Amount in words</small>
+              <div class="strong">{{ words() }}</div>
+            </div>
             @if (d.notes) { <h4>Notes</h4><p class="muted">{{ d.notes }}</p> }
             @if (d.terms) { <h4 class="mt-2">Terms & conditions</h4><p class="muted small">{{ d.terms }}</p> }
           </div>
@@ -149,6 +160,14 @@ import { PaymentDialog } from '../payments/payment-dialog';
               <div class="row"><span>Payments</span><span class="mono">−{{ d.amount_paid | money }}</span></div>
               <div class="row strong"><span>Balance due</span><span class="mono">{{ d.balance | money }}</span></div>
             }
+          </div>
+        </section>
+
+        <section class="sheet__sign">
+          @if (org()?.pdf_footer) { <div class="pdf-footer small">{{ org()?.pdf_footer }}</div> } @else { <div></div> }
+          <div class="sign">
+            <div class="sign__for">For {{ org()?.name }}</div>
+            <div class="sign__line">Authorised signatory</div>
           </div>
         </section>
       </article>
@@ -203,6 +222,12 @@ export class DocumentView implements OnInit {
   protected readonly cfg = computed(() => DOC_CONFIG[this.docType()]);
   protected readonly org = this.auth.organization;
   protected readonly link = docPath;
+  protected readonly templates = PDF_TEMPLATES;
+  /** Template used on screen and in the PDF: the organization default, or a one-off pick from the toolbar. */
+  private readonly picked = signal<PdfTemplateId | null>(null);
+  protected readonly tpl = computed<PdfTemplateId>(() => this.picked() ?? orgPdfTemplate(this.org()));
+  protected readonly accent = computed(() => orgPdfAccent(this.org()));
+  protected readonly words = computed(() => amountInWords(this.doc()?.total ?? 0, this.auth.currency()));
   protected readonly orgCity = computed(() => {
     const o = this.org();
     return [o?.city, o?.state, o?.pincode].filter((v) => !!v).join(', ');
@@ -285,8 +310,17 @@ export class DocumentView implements OnInit {
     }
   }
 
+  protected pickTemplate(e: Event): void {
+    this.picked.set((e.target as HTMLSelectElement).value as PdfTemplateId);
+  }
+
+  /** Opens the browser print dialog; "Save as PDF" there produces e.g. INV-00012.pdf. */
   print(): void {
+    const previous = document.title;
+    const d = this.doc();
+    if (d) document.title = `${d.number}${d.contact?.name ? ' - ' + d.contact.name : ''}`;
     window.print();
+    document.title = previous;
   }
 
   protected onDocClick(e: MouseEvent): void {
