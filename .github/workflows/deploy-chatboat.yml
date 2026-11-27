@@ -17,9 +17,8 @@
 #                   (default: auto-detected — ".", "public_html" or "domains/velouraone.in/public_html")
 name: Deploy /chatboat
 
+# Manual only: pushes now deploy accounts.velouraone.in (deploy-accounts.yml).
 on:
-  push:
-    branches: [feature/gemini-ai-assistant]
   workflow_dispatch:
     inputs:
       mode:
