@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
-import { map } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { ChatMessage } from '../../core/ai/ai.models';
 import { AiService } from '../../core/ai/ai.service';
 import { CHAT_COMMANDS, ChatCommand, parseCommand, suggestCommands } from '../../core/ai/chat-commands';
@@ -10,6 +10,7 @@ import { AuthStore } from '../../core/auth/auth.store';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
 import { Icon } from '../../shared/icon';
+import { FabPosition, FAB_SIZE, clampFab, fabLeftEdge, fabMargin, loadFabPosition, overlapLift, saveFabPosition, snapFab } from './fab-position';
 
 const QUICK = ['/summary', '/dues', '/overdue', '/scan', '/help'];
 const MAX_KEEP = 60;
@@ -28,7 +29,7 @@ const helpText = () =>
   host: { '(document:keydown.control./)': 'toggle()' },
   template: `
     @if (open()) {
-      <section class="chat" role="dialog" aria-label="v-one Assistant">
+      <section class="chat" role="dialog" aria-label="v-one Assistant" [class.is-left]="pos().side === 'left'" [style.left.px]="pos().side === 'left' ? rest().left : null" [style.bottom.px]="panelBottom()" [style.height.px]="panelHeight()">
         <header class="chat__head">
           <span class="chat__logo"><app-icon name="sparkles" [size]="18" /></span>
           <div class="chat__title">
@@ -103,7 +104,22 @@ const helpText = () =>
       </section>
     }
 
-    <button type="button" class="fab" [class.is-open]="open()" (click)="toggle()" [attr.aria-label]="open() ? 'Close assistant' : 'Open AI assistant'" title="AI assistant (Ctrl + /)">
+    <button
+      #fab
+      type="button"
+      class="fab"
+      [class.is-open]="open()"
+      [class.is-dragging]="drag() !== null"
+      [style.left.px]="fabLeft()"
+      [style.top.px]="fabTop()"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (click)="onFabClick($event)"
+      [attr.aria-label]="open() ? 'Close assistant' : 'Open AI assistant'"
+      title="AI assistant (Ctrl + /). Drag to move."
+    >
       <app-icon [name]="open() ? 'x' : 'sparkles'" [size]="24" />
     </button>
   `,
@@ -116,6 +132,7 @@ export class ChatWidget {
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private readonly box = viewChild<ElementRef<HTMLTextAreaElement>>('box');
   private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+  private readonly fab = viewChild<ElementRef<HTMLButtonElement>>('fab');
 
   protected readonly quick = QUICK;
   protected readonly open = signal(false);
@@ -128,6 +145,33 @@ export class ChatWidget {
   protected readonly firstName = computed(() => (this.auth.user()?.name ?? '').split(' ')[0]);
   private readonly htmlCache = new Map<string, string>();
   private seq = Date.now();
+
+  // ---- Movable button -------------------------------------------------------
+  /** Viewport size, kept current so the button stays on screen after rotation or resize. */
+  private readonly viewport = signal({ w: window.innerWidth, h: window.innerHeight });
+  /** Where the person last dropped the button (saved per browser). */
+  protected readonly pos = signal<FabPosition>(loadFabPosition());
+  /** Extra lift so the button does not sit on top of a pinned control, such as a form's Save bar. */
+  private readonly lift = signal(0);
+  /** Live pointer position while dragging; null when the button is at rest. */
+  protected readonly drag = signal<{ x: number; y: number } | null>(null);
+  private press: { id: number; x: number; y: number; dx: number; dy: number } | null = null;
+  private suppressClick = false;
+  private avoidTimer: ReturnType<typeof setTimeout> | undefined;
+
+  protected readonly rest = computed(() => {
+    const { w, h } = this.viewport();
+    const p = clampFab(this.pos(), w, h);
+    return { left: p.side === 'left' ? fabLeftEdge(w) : w - FAB_SIZE - fabMargin(w), bottom: p.bottom + this.lift() };
+  });
+  protected readonly fabLeft = computed(() => this.drag()?.x ?? this.rest().left);
+  protected readonly fabTop = computed(() => this.drag()?.y ?? this.viewport().h - FAB_SIZE - this.rest().bottom);
+  /** Desktop panel opens just above the button, on the same side of the screen. */
+  protected readonly panelBottom = computed(() => {
+    const h = this.viewport().h;
+    return Math.max(16, Math.min(this.rest().bottom + FAB_SIZE + 12, h - 420));
+  });
+  protected readonly panelHeight = computed(() => Math.min(620, this.viewport().h - this.panelBottom() - 20));
 
   constructor() {
     effect(() => {
@@ -142,6 +186,82 @@ export class ChatWidget {
     effect(() => {
       if (this.open()) setTimeout(() => this.box()?.nativeElement.focus());
     });
+
+    const onResize = () => {
+      this.viewport.set({ w: window.innerWidth, h: window.innerHeight });
+      this.scheduleAvoid();
+    };
+    window.addEventListener('resize', onResize);
+    const bodyWatch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.scheduleAvoid());
+    bodyWatch?.observe(document.body);
+    this.router.events
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => {
+        this.scheduleAvoid();
+        setTimeout(() => this.scheduleAvoid(), 900); // lazy pages render after navigation ends
+      });
+    inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('resize', onResize);
+      bodyWatch?.disconnect();
+      clearTimeout(this.avoidTimer);
+    });
+  }
+
+  protected onPointerDown(e: PointerEvent): void {
+    if (e.button !== 0) return;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture?.(e.pointerId); // keep receiving moves when the pointer outruns the button
+    const r = el.getBoundingClientRect();
+    this.press = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top };
+  }
+
+  protected onPointerMove(e: PointerEvent): void {
+    const p = this.press;
+    if (!p || p.id !== e.pointerId) return;
+    if (!this.drag() && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 6) return; // still a tap
+    e.preventDefault();
+    const { w, h } = this.viewport();
+    this.drag.set({
+      x: Math.min(Math.max(e.clientX - p.dx, 4), w - FAB_SIZE - 4),
+      y: Math.min(Math.max(e.clientY - p.dy, 4), h - FAB_SIZE - 4),
+    });
+  }
+
+  protected onPointerUp(e: PointerEvent): void {
+    const d = this.drag();
+    this.press = null;
+    if (!d) return;
+    const { w, h } = this.viewport();
+    this.pos.set(snapFab(d.x, d.y, w, h));
+    saveFabPosition(this.pos());
+    this.lift.set(0);
+    this.drag.set(null);
+    this.suppressClick = true; // the click that follows a drag must not toggle the chat
+    setTimeout(() => (this.suppressClick = false));
+    this.scheduleAvoid(0);
+  }
+
+  protected onFabClick(e: MouseEvent): void {
+    if (this.suppressClick) {
+      e.preventDefault();
+      this.suppressClick = false;
+      return;
+    }
+    this.toggle();
+  }
+
+  private scheduleAvoid(delay = 150): void {
+    clearTimeout(this.avoidTimer);
+    this.avoidTimer = setTimeout(() => {
+      if (this.drag()) return;
+      const { w, h } = this.viewport();
+      const p = clampFab(this.pos(), w, h);
+      const left = p.side === 'left' ? fabLeftEdge(w) : w - FAB_SIZE - fabMargin(w);
+      this.lift.set(overlapLift({ left, bottom: p.bottom }, h, this.fab()?.nativeElement));
+    }, delay);
   }
 
   toggle(): void {

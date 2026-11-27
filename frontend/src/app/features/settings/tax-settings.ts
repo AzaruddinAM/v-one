@@ -19,34 +19,36 @@ import { Icon } from '../../shared/icon';
       <div class="card__header">
         <div><h2>Tax rates</h2><p class="muted">GST, VAT or any sales tax applied on items and transactions. For UAE VAT use type <strong>VAT</strong> for 5% and zero-rated, and <strong>EXEMPT</strong> for exempt supplies (VAT return box 5).</p></div>
       </div>
-      <table class="table">
-        <thead><tr><th>Name</th><th style="width:140px">Rate (%)</th><th style="width:140px">Type</th><th style="width:100px">Active</th><th></th></tr></thead>
-        <tbody>
-          @for (t of taxes(); track t.id) {
-            <tr>
-              <td><input class="input input--sm" [(ngModel)]="t.name" [disabled]="!auth.canDelete()" /></td>
-              <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="t.rate" [disabled]="!auth.canDelete()" /></td>
-              <td><input class="input input--sm" list="tax-types" [(ngModel)]="t.type" [disabled]="!auth.canDelete()" /></td>
-              <td><input type="checkbox" [(ngModel)]="t.is_active" [disabled]="!auth.canDelete()" /></td>
-              <td class="actions">
-                @if (auth.canDelete()) {
-                  <button type="button" class="btn btn--ghost btn--sm" (click)="save(t)">Save</button>
-                  <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(t)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
-                }
-              </td>
-            </tr>
-          }
-          @if (auth.canDelete()) {
-            <tr>
-              <td><input class="input input--sm" placeholder="e.g. IGST 18%" [(ngModel)]="draft.name" /></td>
-              <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="draft.rate" /></td>
-              <td><input class="input input--sm" list="tax-types" [(ngModel)]="draft.type" /></td>
-              <td></td>
-              <td class="actions"><button type="button" class="btn btn--sm" (click)="add()" [disabled]="!draft.name"><app-icon name="plus" [size]="16" /> Add</button></td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Name</th><th style="width:140px">Rate (%)</th><th style="width:140px">Type</th><th style="width:100px">Active</th><th></th></tr></thead>
+          <tbody>
+            @for (t of taxes(); track t.id) {
+              <tr>
+                <td><input class="input input--sm" [(ngModel)]="t.name" [disabled]="!auth.canDelete()" /></td>
+                <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="t.rate" [disabled]="!auth.canDelete()" /></td>
+                <td><input class="input input--sm" list="tax-types" [(ngModel)]="t.type" [disabled]="!auth.canDelete()" /></td>
+                <td><input type="checkbox" [(ngModel)]="t.is_active" [disabled]="!auth.canDelete()" /></td>
+                <td class="actions">
+                  @if (auth.canDelete()) {
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="save(t)">Save</button>
+                    <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(t)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
+                  }
+                </td>
+              </tr>
+            }
+            @if (auth.canDelete()) {
+              <tr>
+                <td><input class="input input--sm" placeholder="e.g. IGST 18%" [(ngModel)]="draft.name" /></td>
+                <td><input class="input input--sm" type="number" min="0" max="100" step="0.01" [(ngModel)]="draft.rate" /></td>
+                <td><input class="input input--sm" list="tax-types" [(ngModel)]="draft.type" /></td>
+                <td></td>
+                <td class="actions"><button type="button" class="btn btn--sm" (click)="add()" [disabled]="!draft.name"><app-icon name="plus" [size]="16" /> Add</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
       <datalist id="tax-types"><option value="GST"></option><option value="VAT"></option><option value="EXEMPT"></option><option value="TAX"></option></datalist>
     </div>
   `,

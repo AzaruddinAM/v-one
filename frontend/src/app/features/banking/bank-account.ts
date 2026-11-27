@@ -66,50 +66,54 @@ const SOURCE: Record<string, string> = {
             <button type="button" [class.active]="onlyUncleared()" (click)="onlyUncleared.set(true)">Uncleared</button>
           </div>
         }
-        <table class="table">
-          <thead><tr>
-            @if (reconciling()) { <th style="width:36px"></th> }
-            <th>Date</th><th>Transaction</th><th>Details</th><th class="text-right">Deposit</th><th class="text-right">Withdrawal</th>
-            @if (!reconciling()) { <th class="text-right">Balance</th><th></th> }
-          </tr></thead>
-          <tbody>
-            @for (r of shown(); track r.key) {
-              <tr [class.cleared]="r.reconciliation_id" (click)="reconciling() && toggle(r.key)" [class.pick]="reconciling()">
-                @if (reconciling()) { <td><input type="checkbox" [checked]="ticked().has(r.key)" (click)="$event.stopPropagation()" (change)="toggle(r.key)" [attr.aria-label]="'Tick ' + label(r)" /></td> }
-                <td>{{ r.date ? (r.date | date: 'dd MMM yyyy') : '—' }}</td>
-                <td>@if (link(r); as l) { <a [routerLink]="l" (click)="$event.stopPropagation()">{{ label(r) }}</a> } @else { {{ label(r) }} }</td>
-                <td>{{ r.contact || r.description || '' }}</td>
-                <td class="text-right mono">{{ r.debit ? (r.debit | money) : '' }}</td>
-                <td class="text-right mono">{{ r.credit ? (r.credit | money) : '' }}</td>
-                @if (!reconciling()) {
-                  <td class="text-right mono">{{ r.balance | money }}</td>
-                  <td>@if (r.reconciliation_id) { <span class="badge" data-tone="success" title="Reconciled">✓ Cleared</span> }</td>
-                }
-              </tr>
-            } @empty {
-              <tr><td colspan="8" class="muted text-center">{{ reconciling() ? 'Nothing left to reconcile up to this date.' : 'No transactions yet.' }}</td></tr>
-            }
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr>
+              @if (reconciling()) { <th style="width:36px"></th> }
+              <th>Date</th><th>Transaction</th><th>Details</th><th class="text-right">Deposit</th><th class="text-right">Withdrawal</th>
+              @if (!reconciling()) { <th class="text-right">Balance</th><th></th> }
+            </tr></thead>
+            <tbody>
+              @for (r of shown(); track r.key) {
+                <tr [class.cleared]="r.reconciliation_id" (click)="reconciling() && toggle(r.key)" [class.pick]="reconciling()">
+                  @if (reconciling()) { <td><input type="checkbox" [checked]="ticked().has(r.key)" (click)="$event.stopPropagation()" (change)="toggle(r.key)" [attr.aria-label]="'Tick ' + label(r)" /></td> }
+                  <td>{{ r.date ? (r.date | date: 'dd MMM yyyy') : '—' }}</td>
+                  <td>@if (link(r); as l) { <a [routerLink]="l" (click)="$event.stopPropagation()">{{ label(r) }}</a> } @else { {{ label(r) }} }</td>
+                  <td>{{ r.contact || r.description || '' }}</td>
+                  <td class="text-right mono">{{ r.debit ? (r.debit | money) : '' }}</td>
+                  <td class="text-right mono">{{ r.credit ? (r.credit | money) : '' }}</td>
+                  @if (!reconciling()) {
+                    <td class="text-right mono">{{ r.balance | money }}</td>
+                    <td>@if (r.reconciliation_id) { <span class="badge" data-tone="success" title="Reconciled">✓ Cleared</span> }</td>
+                  }
+                </tr>
+              } @empty {
+                <tr><td colspan="8" class="muted text-center">{{ reconciling() ? 'Nothing left to reconcile up to this date.' : 'No transactions yet.' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
 
       @if (history().length) {
         <div class="card mt-2">
           <div class="card__header"><h2>Reconciliation history</h2></div>
-          <table class="table">
-            <thead><tr><th>Statement date</th><th class="text-right">Statement balance</th><th class="text-right">Transactions</th><th>By</th><th></th></tr></thead>
-            <tbody>
-              @for (h of history(); track h.id; let first = $first) {
-                <tr>
-                  <td>{{ h.statement_date | date: 'dd MMM yyyy' }}</td>
-                  <td class="text-right mono">{{ h.statement_balance | money }}</td>
-                  <td class="text-right">{{ h.entries_count }}</td>
-                  <td>{{ h.creator?.name || '—' }}</td>
-                  <td class="actions">@if (first && auth.canDelete()) { <button type="button" class="btn btn--ghost btn--sm" (click)="undo(h)">Undo</button> }</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Statement date</th><th class="text-right">Statement balance</th><th class="text-right">Transactions</th><th>By</th><th></th></tr></thead>
+              <tbody>
+                @for (h of history(); track h.id; let first = $first) {
+                  <tr>
+                    <td>{{ h.statement_date | date: 'dd MMM yyyy' }}</td>
+                    <td class="text-right mono">{{ h.statement_balance | money }}</td>
+                    <td class="text-right">{{ h.entries_count }}</td>
+                    <td>{{ h.creator?.name || '—' }}</td>
+                    <td class="actions">@if (first && auth.canDelete()) { <button type="button" class="btn btn--ghost btn--sm" (click)="undo(h)">Undo</button> }</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       }
     } @else {

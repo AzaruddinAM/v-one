@@ -68,35 +68,39 @@ const SOURCE_LABEL: Record<string, string> = {
       @if (data(); as d) {
         @switch (report()) {
           @case ('profit-loss') {
-            <table class="table statement">
-              <tbody>
-                <tr class="section"><td colspan="2">Income</td></tr>
-                @for (l of d.income; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
-                <tr class="subtotal"><td>Total income</td><td class="text-right mono">{{ d.total_income | money }}</td></tr>
-                <tr class="section"><td colspan="2">Expenses</td></tr>
-                @for (l of d.expenses; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
-                <tr class="subtotal"><td>Total expenses</td><td class="text-right mono">{{ d.total_expenses | money }}</td></tr>
-              </tbody>
-              <tfoot>
-                <tr class="grand" [class.loss]="d.net_profit < 0"><td>Net {{ d.net_profit < 0 ? 'loss' : 'profit' }}</td><td class="text-right mono">{{ d.net_profit | money }}</td></tr>
-              </tfoot>
-            </table>
+            <div class="table-wrap">
+              <table class="table statement">
+                <tbody>
+                  <tr class="section"><td colspan="2">Income</td></tr>
+                  @for (l of d.income; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
+                  <tr class="subtotal"><td>Total income</td><td class="text-right mono">{{ d.total_income | money }}</td></tr>
+                  <tr class="section"><td colspan="2">Expenses</td></tr>
+                  @for (l of d.expenses; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
+                  <tr class="subtotal"><td>Total expenses</td><td class="text-right mono">{{ d.total_expenses | money }}</td></tr>
+                </tbody>
+                <tfoot>
+                  <tr class="grand" [class.loss]="d.net_profit < 0"><td>Net {{ d.net_profit < 0 ? 'loss' : 'profit' }}</td><td class="text-right mono">{{ d.net_profit | money }}</td></tr>
+                </tfoot>
+              </table>
+            </div>
           }
           @case ('balance-sheet') {
-            <table class="table statement">
-              <tbody>
-                <tr class="section"><td colspan="2">Assets</td></tr>
-                @for (l of d.assets; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
-                <tr class="subtotal"><td>Total assets</td><td class="text-right mono">{{ d.total_assets | money }}</td></tr>
-                <tr class="section"><td colspan="2">Liabilities</td></tr>
-                @for (l of d.liabilities; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
-                <tr class="subtotal"><td>Total liabilities</td><td class="text-right mono">{{ d.total_liabilities | money }}</td></tr>
-                <tr class="section"><td colspan="2">Equity</td></tr>
-                @for (l of d.equity; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
-                <tr class="subtotal"><td>Total equity</td><td class="text-right mono">{{ d.total_equity | money }}</td></tr>
-              </tbody>
-              <tfoot><tr class="grand"><td>Liabilities + Equity</td><td class="text-right mono">{{ d.total_liabilities + d.total_equity | money }}</td></tr></tfoot>
-            </table>
+            <div class="table-wrap">
+              <table class="table statement">
+                <tbody>
+                  <tr class="section"><td colspan="2">Assets</td></tr>
+                  @for (l of d.assets; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
+                  <tr class="subtotal"><td>Total assets</td><td class="text-right mono">{{ d.total_assets | money }}</td></tr>
+                  <tr class="section"><td colspan="2">Liabilities</td></tr>
+                  @for (l of d.liabilities; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
+                  <tr class="subtotal"><td>Total liabilities</td><td class="text-right mono">{{ d.total_liabilities | money }}</td></tr>
+                  <tr class="section"><td colspan="2">Equity</td></tr>
+                  @for (l of d.equity; track $index) { <tr><td class="indent">{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td></tr> }
+                  <tr class="subtotal"><td>Total equity</td><td class="text-right mono">{{ d.total_equity | money }}</td></tr>
+                </tbody>
+                <tfoot><tr class="grand"><td>Liabilities + Equity</td><td class="text-right mono">{{ d.total_liabilities + d.total_equity | money }}</td></tr></tfoot>
+              </table>
+            </div>
           }
           @case ('vat-return') {
             <div class="kpis tax">
@@ -105,21 +109,25 @@ const SOURCE_LABEL: Record<string, string> = {
               <div class="card kpi"><div><div class="kpi__label">{{ d.net_vat < 0 ? 'Refundable VAT' : 'Net VAT due' }} (box 14)</div><div class="kpi__value" [class.text-danger]="d.net_vat > 0">{{ d.net_vat | money }}</div></div></div>
             </div>
             <div class="tax-tables">
-              <table class="table statement">
-                <thead><tr><th style="width:60px">Box</th><th>VAT on sales and all other outputs</th><th class="text-right">Amount</th><th class="text-right">VAT</th></tr></thead>
-                <tbody>
-                  @for (l of d.supplies; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
-                  <tr class="subtotal"><td>8</td><td>Totals</td><td class="text-right mono">{{ d.supplies_total.amount | money }}</td><td class="text-right mono">{{ d.supplies_total.vat | money }}</td></tr>
-                </tbody>
-              </table>
-              <table class="table statement mt-2">
-                <thead><tr><th style="width:60px">Box</th><th>VAT on expenses and all other inputs</th><th class="text-right">Amount</th><th class="text-right">Recoverable VAT</th></tr></thead>
-                <tbody>
-                  @for (l of d.expenses; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
-                  <tr class="subtotal"><td>12</td><td>Totals</td><td class="text-right mono">{{ d.expenses_total.amount | money }}</td><td class="text-right mono">{{ d.expenses_total.vat | money }}</td></tr>
-                </tbody>
-                <tfoot><tr class="grand" [class.loss]="d.net_vat < 0"><td>14</td><td>Payable tax for the period</td><td></td><td class="text-right mono">{{ d.net_vat | money }}</td></tr></tfoot>
-              </table>
+              <div class="table-wrap">
+                <table class="table statement">
+                  <thead><tr><th style="width:60px">Box</th><th>VAT on sales and all other outputs</th><th class="text-right">Amount</th><th class="text-right">VAT</th></tr></thead>
+                  <tbody>
+                    @for (l of d.supplies; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
+                    <tr class="subtotal"><td>8</td><td>Totals</td><td class="text-right mono">{{ d.supplies_total.amount | money }}</td><td class="text-right mono">{{ d.supplies_total.vat | money }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-wrap">
+                <table class="table statement mt-2">
+                  <thead><tr><th style="width:60px">Box</th><th>VAT on expenses and all other inputs</th><th class="text-right">Amount</th><th class="text-right">Recoverable VAT</th></tr></thead>
+                  <tbody>
+                    @for (l of d.expenses; track l.box) { <tr><td>{{ l.box }}</td><td>{{ l.name }}</td><td class="text-right mono">{{ l.amount | money }}</td><td class="text-right mono">{{ l.vat | money }}</td></tr> }
+                    <tr class="subtotal"><td>12</td><td>Totals</td><td class="text-right mono">{{ d.expenses_total.amount | money }}</td><td class="text-right mono">{{ d.expenses_total.vat | money }}</td></tr>
+                  </tbody>
+                  <tfoot><tr class="grand" [class.loss]="d.net_vat < 0"><td>14</td><td>Payable tax for the period</td><td></td><td class="text-right mono">{{ d.net_vat | money }}</td></tr></tfoot>
+                </table>
+              </div>
               <p class="muted small mt-1">
                 Supplies are classified by the VAT rate on each invoice line: 5% = standard rated, 0% = zero rated, tax type EXEMPT = exempt.
                 Credit notes and vendor credits are deducted in the period they are dated.
@@ -138,13 +146,15 @@ const SOURCE_LABEL: Record<string, string> = {
               @for (blk of [{ t: 'Output tax (invoices)', rows: d.output }, { t: 'Input tax (bills)', rows: d.input }]; track blk.t) {
                 <div>
                   <h3>{{ blk.t }}</h3>
-                  <table class="table">
-                    <thead><tr><th>Rate</th><th class="text-right">Taxable value</th><th class="text-right">Tax</th></tr></thead>
-                    <tbody>
-                      @for (r of blk.rows; track $index) { <tr><td>{{ r.rate }}%</td><td class="text-right mono">{{ r.taxable | money }}</td><td class="text-right mono">{{ r.tax | money }}</td></tr> }
-                      @empty { <tr><td colspan="3" class="muted">No data</td></tr> }
-                    </tbody>
-                  </table>
+                  <div class="table-wrap">
+                    <table class="table">
+                      <thead><tr><th>Rate</th><th class="text-right">Taxable value</th><th class="text-right">Tax</th></tr></thead>
+                      <tbody>
+                        @for (r of blk.rows; track $index) { <tr><td>{{ r.rate }}%</td><td class="text-right mono">{{ r.taxable | money }}</td><td class="text-right mono">{{ r.tax | money }}</td></tr> }
+                        @empty { <tr><td colspan="3" class="muted">No data</td></tr> }
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               }
             </div>
@@ -158,53 +168,57 @@ const SOURCE_LABEL: Record<string, string> = {
               </select>
             </div>
             @for (a of glAccounts(); track a.account_id) {
-              <table class="table statement gl">
-                <thead>
-                  <tr class="section"><td colspan="6">{{ a.code }} · {{ a.name }}</td></tr>
-                  <tr><th>Date</th><th>Transaction</th><th>Details</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th class="text-right">Balance</th></tr>
-                </thead>
-                <tbody>
-                  <tr class="muted"><td colspan="5">Opening balance</td><td class="text-right mono">{{ dc(a.opening) }}</td></tr>
-                  @for (r of a.rows; track $index) {
-                    <tr>
-                      <td class="nowrap">{{ r.date | date: 'dd MMM yyyy' }}</td>
-                      <td>@if (srcLink(r); as l) { <a [routerLink]="l">{{ srcLabel(r) }}</a> } @else { {{ srcLabel(r) }} }</td>
-                      <td>{{ r.contact || r.description || '' }}</td>
-                      <td class="text-right mono">{{ r.debit ? (r.debit | money) : '' }}</td>
-                      <td class="text-right mono">{{ r.credit ? (r.credit | money) : '' }}</td>
-                      <td class="text-right mono">{{ dc(r.balance) }}</td>
-                    </tr>
-                  }
-                </tbody>
-                <tfoot><tr class="subtotal"><td colspan="3">Closing balance</td><td class="text-right mono">{{ a.debit | money }}</td><td class="text-right mono">{{ a.credit | money }}</td><td class="text-right mono">{{ dc(a.closing) }}</td></tr></tfoot>
-              </table>
+              <div class="table-wrap">
+                <table class="table statement gl">
+                  <thead>
+                    <tr class="section"><td colspan="6">{{ a.code }} · {{ a.name }}</td></tr>
+                    <tr><th>Date</th><th>Transaction</th><th>Details</th><th class="text-right">Debit</th><th class="text-right">Credit</th><th class="text-right">Balance</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr class="muted"><td colspan="5">Opening balance</td><td class="text-right mono">{{ dc(a.opening) }}</td></tr>
+                    @for (r of a.rows; track $index) {
+                      <tr>
+                        <td class="nowrap">{{ r.date | date: 'dd MMM yyyy' }}</td>
+                        <td>@if (srcLink(r); as l) { <a [routerLink]="l">{{ srcLabel(r) }}</a> } @else { {{ srcLabel(r) }} }</td>
+                        <td>{{ r.contact || r.description || '' }}</td>
+                        <td class="text-right mono">{{ r.debit ? (r.debit | money) : '' }}</td>
+                        <td class="text-right mono">{{ r.credit ? (r.credit | money) : '' }}</td>
+                        <td class="text-right mono">{{ dc(r.balance) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                  <tfoot><tr class="subtotal"><td colspan="3">Closing balance</td><td class="text-right mono">{{ a.debit | money }}</td><td class="text-right mono">{{ a.credit | money }}</td><td class="text-right mono">{{ dc(a.closing) }}</td></tr></tfoot>
+                </table>
+              </div>
             } @empty { <p class="muted text-center">No postings for this period.</p> }
           }
           @case ('day-book') {
-            <table class="table statement">
-              <thead><tr><th>Date</th><th>Transaction</th><th>Account</th><th class="text-right">Debit</th><th class="text-right">Credit</th></tr></thead>
-              @for (t of d.transactions; track $index) {
-                <tbody class="tx">
-                  @for (l of t.lines; track $index; let first = $first) {
-                    <tr>
-                      <td class="nowrap">{{ first ? (t.date | date: 'dd MMM yyyy') : '' }}</td>
-                      <td>
-                        @if (first) {
-                          @if (srcLink(t); as lk) { <a [routerLink]="lk">{{ srcLabel(t) }}</a> } @else { {{ srcLabel(t) }} }
-                          @if (t.contact) { <div class="muted small">{{ t.contact }}</div> }
-                        }
-                      </td>
-                      <td [class.indent]="!l.debit">{{ l.account }}</td>
-                      <td class="text-right mono">{{ l.debit ? (l.debit | money) : '' }}</td>
-                      <td class="text-right mono">{{ l.credit ? (l.credit | money) : '' }}</td>
-                    </tr>
-                  }
-                </tbody>
-              } @empty { <tbody><tr><td colspan="5" class="muted text-center">No transactions for this period.</td></tr></tbody> }
-              @if (d.transactions.length) {
-                <tfoot><tr class="subtotal"><td colspan="3">{{ d.transactions.length }} transactions</td><td class="text-right mono">{{ d.total | money }}</td><td class="text-right mono">{{ d.total | money }}</td></tr></tfoot>
-              }
-            </table>
+            <div class="table-wrap">
+              <table class="table statement">
+                <thead><tr><th>Date</th><th>Transaction</th><th>Account</th><th class="text-right">Debit</th><th class="text-right">Credit</th></tr></thead>
+                @for (t of d.transactions; track $index) {
+                  <tbody class="tx">
+                    @for (l of t.lines; track $index; let first = $first) {
+                      <tr>
+                        <td class="nowrap">{{ first ? (t.date | date: 'dd MMM yyyy') : '' }}</td>
+                        <td>
+                          @if (first) {
+                            @if (srcLink(t); as lk) { <a [routerLink]="lk">{{ srcLabel(t) }}</a> } @else { {{ srcLabel(t) }} }
+                            @if (t.contact) { <div class="muted small">{{ t.contact }}</div> }
+                          }
+                        </td>
+                        <td [class.indent]="!l.debit">{{ l.account }}</td>
+                        <td class="text-right mono">{{ l.debit ? (l.debit | money) : '' }}</td>
+                        <td class="text-right mono">{{ l.credit ? (l.credit | money) : '' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                } @empty { <tbody><tr><td colspan="5" class="muted text-center">No transactions for this period.</td></tr></tbody> }
+                @if (d.transactions.length) {
+                  <tfoot><tr class="subtotal"><td colspan="3">{{ d.transactions.length }} transactions</td><td class="text-right mono">{{ d.total | money }}</td><td class="text-right mono">{{ d.total | money }}</td></tr></tfoot>
+                }
+              </table>
+            </div>
           }
           @default {
             <div class="table-wrap">

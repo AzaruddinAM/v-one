@@ -40,19 +40,21 @@ import { MoneyPipe } from '../../shared/money.pipe';
           }
         }
         @if (s.applications.length) {
-          <table class="table">
-            <thead><tr><th>Date</th><th>Payment #</th><th>Invoice</th><th class="text-right">Applied</th></tr></thead>
-            <tbody>
-              @for (a of s.applications; track a.id) {
-                <tr>
-                  <td>{{ a.date | date: 'dd MMM yyyy' }}</td>
-                  <td>{{ a.number }}</td>
-                  <td>@if (a.document) { <a [routerLink]="link('invoice', a.document.id)">{{ a.document.number }}</a> }</td>
-                  <td class="text-right mono">{{ a.amount | money }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Date</th><th>Payment #</th><th>Invoice</th><th class="text-right">Applied</th></tr></thead>
+              <tbody>
+                @for (a of s.applications; track a.id) {
+                  <tr>
+                    <td>{{ a.date | date: 'dd MMM yyyy' }}</td>
+                    <td>{{ a.number }}</td>
+                    <td>@if (a.document) { <a [routerLink]="link('invoice', a.document.id)">{{ a.document.number }}</a> }</td>
+                    <td class="text-right mono">{{ a.amount | money }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       </div>
     }

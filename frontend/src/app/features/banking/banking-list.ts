@@ -36,21 +36,23 @@ import { PageHeader } from '../../shared/page-header';
     </div>
 
     <div class="card mt-2">
-      <table class="table">
-        <thead><tr><th>Account</th><th>Type</th><th>Last reconciled</th><th class="text-right">Uncleared</th><th class="text-right">Balance in books</th><th></th></tr></thead>
-        <tbody>
-          @for (a of accounts(); track a.id) {
-            <tr>
-              <td><a [routerLink]="['/banking', a.id]"><strong>{{ a.name }}</strong></a><div class="muted small">{{ a.code }}{{ a.description ? ' · ' + a.description : '' }}</div></td>
-              <td><span class="badge">{{ a.sub_type === 'bank' ? 'Bank' : 'Cash' }}</span></td>
-              <td>{{ a.last_reconciled ? (a.last_reconciled | date: 'dd MMM yyyy') : 'Never' }}</td>
-              <td class="text-right">{{ a.uncleared }}</td>
-              <td class="text-right mono" [class.text-danger]="a.balance < 0">{{ a.balance | money }}</td>
-              <td class="actions"><a class="btn btn--outline btn--sm" [routerLink]="['/banking', a.id]" [queryParams]="{ reconcile: 1 }">Reconcile</a></td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Account</th><th>Type</th><th>Last reconciled</th><th class="text-right">Uncleared</th><th class="text-right">Balance in books</th><th></th></tr></thead>
+          <tbody>
+            @for (a of accounts(); track a.id) {
+              <tr>
+                <td><a [routerLink]="['/banking', a.id]"><strong>{{ a.name }}</strong></a><div class="muted small">{{ a.code }}{{ a.description ? ' · ' + a.description : '' }}</div></td>
+                <td><span class="badge">{{ a.sub_type === 'bank' ? 'Bank' : 'Cash' }}</span></td>
+                <td>{{ a.last_reconciled ? (a.last_reconciled | date: 'dd MMM yyyy') : 'Never' }}</td>
+                <td class="text-right">{{ a.uncleared }}</td>
+                <td class="text-right mono" [class.text-danger]="a.balance < 0">{{ a.balance | money }}</td>
+                <td class="actions"><a class="btn btn--outline btn--sm" [routerLink]="['/banking', a.id]" [queryParams]="{ reconcile: 1 }">Reconcile</a></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
 
     @if (adding()) {

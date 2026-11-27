@@ -96,25 +96,27 @@ import { RetainerPanel } from './retainer-panel';
       @if (cfg().payable && d.payments?.length) {
         <div class="card mt-2 no-print">
           <div class="card__header"><h2>Payments</h2></div>
-          <table class="table">
-            <thead><tr><th>Date</th><th>Payment #</th><th>Mode</th><th>Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
-            <tbody>
-              @for (p of d.payments; track p.id) {
-                <tr>
-                  <td>{{ p.date | date: 'dd MMM yyyy' }}</td>
-                  <td>{{ p.number }}</td>
-                  <td style="text-transform:capitalize">{{ p.mode.replace('_', ' ') }}</td>
-                  <td>{{ p.reference || '—' }}</td>
-                  <td class="text-right mono">{{ p.amount | money }}</td>
-                  <td class="actions">
-                    @if (auth.canDelete()) {
-                      <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="deletePayment(p.id)" aria-label="Delete payment"><app-icon name="trash" [size]="16" /></button>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Date</th><th>Payment #</th><th>Mode</th><th>Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
+              <tbody>
+                @for (p of d.payments; track p.id) {
+                  <tr>
+                    <td>{{ p.date | date: 'dd MMM yyyy' }}</td>
+                    <td>{{ p.number }}</td>
+                    <td style="text-transform:capitalize">{{ p.mode.replace('_', ' ') }}</td>
+                    <td>{{ p.reference || '—' }}</td>
+                    <td class="text-right mono">{{ p.amount | money }}</td>
+                    <td class="actions">
+                      @if (auth.canDelete()) {
+                        <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="deletePayment(p.id)" aria-label="Delete payment"><app-icon name="trash" [size]="16" /></button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       }
 

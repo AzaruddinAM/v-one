@@ -33,23 +33,25 @@ export const JournalListStore = signalStore(withPaginatedList<Journal>('journals
           <a routerLink="/accounting/journals/new" class="btn"><app-icon name="plus" /> New journal</a>
         </app-empty-state>
       } @else {
-        <table class="table">
-          <thead><tr><th>Date</th><th>Journal #</th><th>Reference</th><th>Notes</th><th class="text-right">Amount</th><th></th></tr></thead>
-          <tbody>
-            @for (j of store.entities(); track j.id) {
-              <tr class="is-clickable" [routerLink]="['/accounting/journals', j.id, 'edit']">
-                <td>{{ j.date | date: 'dd MMM yyyy' }}</td>
-                <td class="strong">{{ j.number }}</td>
-                <td>{{ j.reference || '—' }}</td>
-                <td class="muted">{{ j.notes }}</td>
-                <td class="text-right mono">{{ j.total | money }}</td>
-                <td class="actions" (click)="$event.stopPropagation()">
-                  <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(j)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Date</th><th>Journal #</th><th>Reference</th><th>Notes</th><th class="text-right">Amount</th><th></th></tr></thead>
+            <tbody>
+              @for (j of store.entities(); track j.id) {
+                <tr class="is-clickable" [routerLink]="['/accounting/journals', j.id, 'edit']">
+                  <td>{{ j.date | date: 'dd MMM yyyy' }}</td>
+                  <td class="strong">{{ j.number }}</td>
+                  <td>{{ j.reference || '—' }}</td>
+                  <td class="muted">{{ j.notes }}</td>
+                  <td class="text-right mono">{{ j.total | money }}</td>
+                  <td class="actions" (click)="$event.stopPropagation()">
+                    <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(j)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
         <app-pagination [page]="store.page()" [lastPage]="store.lastPage()" [label]="store.rangeLabel()" (go)="store.goTo($event)" />
       }
     </div>

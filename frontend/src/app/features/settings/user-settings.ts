@@ -23,26 +23,28 @@ import { PHONE_PATTERN } from '../auth/login';
         <div><h2>Users & roles</h2><p class="muted">Admins manage everything · Accountants can edit and delete · Staff can create and view.</p></div>
         <button type="button" class="btn" (click)="open()"><app-icon name="plus" /> Invite user</button>
       </div>
-      <table class="table">
-        <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr></thead>
-        <tbody>
-          @for (u of users(); track u.id) {
-            <tr>
-              <td><div class="gap"><div class="avatar">{{ u.name.charAt(0) }}</div><div><strong>{{ u.name }}</strong><span class="sub">{{ u.email }}</span></div></div></td>
-              <td>{{ u.phone }}</td>
-              <td><span class="chip" style="text-transform:capitalize">{{ u.role }}</span></td>
-              <td><app-status-badge [status]="u.is_active ? 'active' : 'inactive'" /></td>
-              <td class="muted">{{ u.last_login_at ? (u.last_login_at | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
-              <td class="actions">
-                <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="open(u)" aria-label="Edit"><app-icon name="edit" [size]="16" /></button>
-                @if (u.id !== auth.user()?.id) {
-                  <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(u)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Mobile</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr></thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr>
+                <td><div class="gap"><div class="avatar">{{ u.name.charAt(0) }}</div><div><strong>{{ u.name }}</strong><span class="sub">{{ u.email }}</span></div></div></td>
+                <td>{{ u.phone }}</td>
+                <td><span class="chip" style="text-transform:capitalize">{{ u.role }}</span></td>
+                <td><app-status-badge [status]="u.is_active ? 'active' : 'inactive'" /></td>
+                <td class="muted">{{ u.last_login_at ? (u.last_login_at | date: 'dd MMM yyyy, HH:mm') : 'Never' }}</td>
+                <td class="actions">
+                  <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="open(u)" aria-label="Edit"><app-icon name="edit" [size]="16" /></button>
+                  @if (u.id !== auth.user()?.id) {
+                    <button type="button" class="btn btn--ghost btn--sm btn--icon" (click)="remove(u)" aria-label="Delete"><app-icon name="trash" [size]="16" /></button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
 
     @if (editing()) {
