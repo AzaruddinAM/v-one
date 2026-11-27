@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -47,7 +48,26 @@ class OrganizationController extends Controller
             ];
         }
 
-        $org->update($request->validate($rules));
+        if (Schema::hasColumn('organizations', 'pdf_options')) {
+            $rules['pdf_options'] = ['sometimes', 'nullable', 'array'];
+            foreach (Organization::pdfOptionRules() as $key => $keyRules) {
+                $rules["pdf_options.$key"] = $keyRules;
+            }
+        }
+
+        $data = $request->validate($rules);
+        if (isset($data['pdf_options'])) {
+            // Keep only known keys, with booleans stored as real booleans.
+            $options = Arr::only($data['pdf_options'], array_keys(Organization::pdfOptionRules()));
+            foreach ($options as $key => $value) {
+                if (str_starts_with($key, 'show_')) {
+                    $options[$key] = (bool) $value;
+                }
+            }
+            $data['pdf_options'] = $options;
+        }
+
+        $org->update($data);
 
         return $org->fresh();
     }

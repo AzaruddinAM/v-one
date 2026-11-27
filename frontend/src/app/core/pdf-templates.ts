@@ -1,4 +1,4 @@
-import { Organization, PdfTemplateId } from './api/models';
+import { Organization, PdfOptions, PdfTemplateId } from './api/models';
 
 export interface PdfTemplate {
   id: PdfTemplateId;
@@ -28,6 +28,56 @@ export function orgPdfAccent(org: Organization | null | undefined): string {
   const a = org?.pdf_accent;
   return a && /^#[0-9a-f]{6}$/i.test(a) ? a : DEFAULT_PDF_ACCENT;
 }
+
+export const DEFAULT_PDF_OPTIONS: PdfOptions = {
+  logo: null,
+  logo_position: 'left',
+  logo_size: 'm',
+  show_org_name: true,
+  header_text: '',
+  show_org_address: true,
+  show_org_gstin: true,
+  show_org_phone: true,
+  show_org_email: false,
+  title_invoice: '',
+  title_estimate: '',
+  show_customer_gstin: true,
+  show_item_description: true,
+  show_discount_column: true,
+  show_tax_column: true,
+  show_amount_words: true,
+  show_notes: true,
+  show_terms: true,
+  show_balance: true,
+  show_paid_stamp: true,
+  show_signature: true,
+  signature: null,
+  signatory_label: 'Authorised signatory',
+  footer_note: '',
+  font: 'sans',
+  font_size: 'normal',
+  paper: 'A4',
+};
+
+/** Organization options merged over the defaults; unknown or wrongly typed values fall back to the default. */
+export function orgPdfOptions(org: Organization | null | undefined): PdfOptions {
+  const saved = (org?.pdf_options ?? {}) as Record<string, unknown>;
+  const out = { ...DEFAULT_PDF_OPTIONS } as Record<string, unknown>;
+  for (const [key, def] of Object.entries(DEFAULT_PDF_OPTIONS)) {
+    const v = saved[key];
+    if (v === undefined) continue;
+    if (def === null ? v === null || typeof v === 'string' : typeof v === typeof def) out[key] = v;
+  }
+  return out as unknown as PdfOptions;
+}
+
+export const PAPER_SIZES: Record<PdfOptions['paper'], string> = { A4: 'A4', Letter: 'Letter', A5: 'A5' };
+
+export const PDF_FONTS: Record<PdfOptions['font'], string> = {
+  sans: 'inherit',
+  serif: "Georgia, Cambria, 'Times New Roman', serif",
+  mono: "ui-monospace, 'Cascadia Mono', Consolas, monospace",
+};
 
 const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
 const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];

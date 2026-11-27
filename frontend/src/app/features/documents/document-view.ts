@@ -5,19 +5,19 @@ import { ApiService } from '../../core/api/api.service';
 import { Document, DocumentType, PdfTemplateId } from '../../core/api/models';
 import { AuthStore } from '../../core/auth/auth.store';
 import { DOC_CONFIG, docPath } from '../../core/documents.config';
-import { amountInWords, orgPdfAccent, orgPdfTemplate, PDF_TEMPLATES } from '../../core/pdf-templates';
+import { orgPdfAccent, orgPdfOptions, orgPdfTemplate, PAPER_SIZES, PDF_TEMPLATES } from '../../core/pdf-templates';
 import { ConfirmService } from '../../core/ui/confirm.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { errorMessage } from '../../core/utils/http-error';
-import { calculateTotals } from '../../core/utils/totals';
 import { Icon } from '../../shared/icon';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { StatusBadge } from '../../shared/status-badge';
 import { PaymentDialog } from '../payments/payment-dialog';
+import { DocumentSheet } from './document-sheet';
 
 @Component({
   selector: 'app-document-view',
-  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog],
+  imports: [RouterLink, DatePipe, Icon, MoneyPipe, StatusBadge, PaymentDialog, DocumentSheet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './document-view.scss',
   template: `
@@ -70,107 +70,7 @@ import { PaymentDialog } from '../payments/payment-dialog';
         </div>
       }
 
-      <article class="card sheet" [class]="'tpl-' + tpl()" [style.--accent]="accent()">
-        @if (d.status === 'paid') { <div class="ribbon">PAID</div> }
-        <header class="sheet__head">
-          <div>
-            <div class="org-name">{{ org()?.name }}</div>
-            <div class="muted small org-meta">
-              @if (org()?.address) { {{ org()?.address }}<br /> }
-              {{ orgCity() }}
-              @if (org()?.gstin) { <br />GSTIN: {{ org()?.gstin }} }
-              @if (org()?.phone) { <br />{{ org()?.phone }} }
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="doc-title">{{ title() }}</div>
-            <div class="muted"># {{ d.number }}</div>
-            @if (cfg().payable) {
-              <div class="due-box">
-                <small>Balance due</small>
-                <strong>{{ d.balance | money }}</strong>
-              </div>
-            }
-          </div>
-        </header>
-
-        <section class="sheet__meta">
-          <div>
-            <small class="muted">{{ cfg().contactType === 'customer' ? 'Bill to' : 'Vendor' }}</small>
-            @if (d.contact; as c) {
-              <div class="strong">{{ c.name }}</div>
-              <div class="muted small">
-                @if (c.company_name) { {{ c.company_name }}<br /> }
-                @if (c.billing_address) { <span style="white-space:pre-line">{{ c.billing_address }}</span><br /> }
-                @if (c.gstin) { GSTIN: {{ c.gstin }} }
-              </div>
-            }
-          </div>
-          <dl class="dl">
-            <dt>{{ cfg().label }} date</dt><dd>{{ d.date | date: 'dd MMM yyyy' }}</dd>
-            @if (d.due_date) { <dt>{{ cfg().dueLabel }}</dt><dd>{{ d.due_date | date: 'dd MMM yyyy' }}</dd> }
-            @if (d.reference) { <dt>Reference</dt><dd>{{ d.reference }}</dd> }
-          </dl>
-        </section>
-
-        <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr><th>#</th><th>Item & description</th><th class="text-right">Qty</th><th class="text-right">Rate</th><th class="text-right">Disc</th><th class="text-right">Tax</th><th class="text-right">Amount</th></tr>
-            </thead>
-            <tbody>
-              @for (l of d.items; track $index) {
-                <tr>
-                  <td class="muted">{{ $index + 1 }}</td>
-                  <td><strong>{{ l.name }}</strong>@if (l.description) { <span class="sub">{{ l.description }}</span> }</td>
-                  <td class="text-right mono">{{ l.quantity }} {{ l.unit }}</td>
-                  <td class="text-right mono">{{ l.rate | money: false }}</td>
-                  <td class="text-right mono">{{ l.discount_percent ? l.discount_percent + '%' : '—' }}</td>
-                  <td class="text-right mono">{{ l.tax_rate ? l.tax_rate + '%' : '—' }}</td>
-                  <td class="text-right mono">{{ l.amount | money: false }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-
-        <section class="sheet__foot">
-          <div class="notes">
-            <div class="words">
-              <small class="muted">Amount in words</small>
-              <div class="strong">{{ words() }}</div>
-            </div>
-            @if (d.notes) { <h4>Notes</h4><p class="muted">{{ d.notes }}</p> }
-            @if (d.terms) { <h4 class="mt-2">Terms & conditions</h4><p class="muted small">{{ d.terms }}</p> }
-          </div>
-          <div class="sum">
-            <div class="row"><span>Sub total</span><span class="mono">{{ d.subtotal | money }}</span></div>
-            @for (t of breakup(); track t.rate) {
-              @if (halfTax()) {
-                <div class="row muted"><span>CGST &#64; {{ t.rate / 2 }}%</span><span class="mono">{{ t.amount / 2 | money }}</span></div>
-                <div class="row muted"><span>SGST &#64; {{ t.rate / 2 }}%</span><span class="mono">{{ t.amount / 2 | money }}</span></div>
-              } @else {
-                <div class="row muted"><span>Tax &#64; {{ t.rate }}%</span><span class="mono">{{ t.amount | money }}</span></div>
-              }
-            }
-            @if (d.discount) { <div class="row"><span>Discount</span><span class="mono">−{{ d.discount | money }}</span></div> }
-            @if (d.adjustment) { <div class="row"><span>Adjustment</span><span class="mono">{{ d.adjustment | money }}</span></div> }
-            <div class="row total"><span>Total</span><span class="mono">{{ d.total | money }}</span></div>
-            @if (cfg().payable) {
-              <div class="row"><span>Payments</span><span class="mono">−{{ d.amount_paid | money }}</span></div>
-              <div class="row strong"><span>Balance due</span><span class="mono">{{ d.balance | money }}</span></div>
-            }
-          </div>
-        </section>
-
-        <section class="sheet__sign">
-          @if (org()?.pdf_footer) { <div class="pdf-footer small">{{ org()?.pdf_footer }}</div> } @else { <div></div> }
-          <div class="sign">
-            <div class="sign__for">For {{ org()?.name }}</div>
-            <div class="sign__line">Authorised signatory</div>
-          </div>
-        </section>
-      </article>
+      <app-document-sheet [doc]="d" [org]="org()" [template]="tpl()" [accent]="accent()" [options]="opts()" [footer]="org()?.pdf_footer" />
 
       @if (cfg().payable && d.payments?.length) {
         <div class="card mt-2 no-print">
@@ -227,28 +127,9 @@ export class DocumentView implements OnInit {
   private readonly picked = signal<PdfTemplateId | null>(null);
   protected readonly tpl = computed<PdfTemplateId>(() => this.picked() ?? orgPdfTemplate(this.org()));
   protected readonly accent = computed(() => orgPdfAccent(this.org()));
-  protected readonly words = computed(() => amountInWords(this.doc()?.total ?? 0, this.auth.currency()));
-  protected readonly orgCity = computed(() => {
-    const o = this.org();
-    return [o?.city, o?.state, o?.pincode].filter((v) => !!v).join(', ');
-  });
+  protected readonly opts = computed(() => orgPdfOptions(this.org()));
   protected readonly sendStatus = computed(() => (['invoice', 'estimate'].includes(this.docType()) ? 'sent' : 'open'));
   protected readonly convertLabel = computed(() => (this.cfg().convertTo ? DOC_CONFIG[this.cfg().convertTo!].label : ''));
-  protected readonly title = computed(() => {
-    const d = this.doc();
-    if (d?.type === 'invoice') return this.org()?.gstin ? 'TAX INVOICE' : 'INVOICE';
-    return this.cfg().label.toUpperCase();
-  });
-  /** Intra-state GST shows CGST + SGST split. */
-  protected readonly halfTax = computed(() => {
-    const o = this.org();
-    const c = this.doc()?.contact;
-    return !!o?.gstin && (!c?.state || !o.state || c.state.toLowerCase() === o.state.toLowerCase());
-  });
-  protected readonly breakup = computed(() => {
-    const d = this.doc();
-    return d ? calculateTotals(d.items ?? []).taxBreakup : [];
-  });
 
   ngOnInit(): void {
     this.load();
@@ -319,7 +200,12 @@ export class DocumentView implements OnInit {
     const previous = document.title;
     const d = this.doc();
     if (d) document.title = `${d.number}${d.contact?.name ? ' - ' + d.contact.name : ''}`;
+    // Paper size for this print only (Settings → PDF templates → Paper).
+    const page = document.createElement('style');
+    page.textContent = `@page { size: ${PAPER_SIZES[this.opts().paper] ?? 'A4'}; margin: 12mm; }`;
+    document.head.appendChild(page);
     window.print();
+    page.remove();
     document.title = previous;
   }
 

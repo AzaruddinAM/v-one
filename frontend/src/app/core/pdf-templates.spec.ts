@@ -1,4 +1,4 @@
-import { amountInWords, numberToWords, orgPdfAccent, orgPdfTemplate } from './pdf-templates';
+import { amountInWords, DEFAULT_PDF_OPTIONS, numberToWords, orgPdfAccent, orgPdfOptions, orgPdfTemplate } from './pdf-templates';
 
 describe('numberToWords', () => {
   it('spells small numbers', () => {
@@ -40,5 +40,20 @@ describe('organization PDF settings', () => {
     expect(orgPdfTemplate({ pdf_template: 'gst' } as never)).toBe('gst');
     expect(orgPdfAccent({ pdf_accent: 'red' } as never)).toBe('#4f46e5');
     expect(orgPdfAccent({ pdf_accent: '#0f766e' } as never)).toBe('#0f766e');
+  });
+});
+
+describe('orgPdfOptions', () => {
+  it('returns defaults when nothing is saved', () => {
+    expect(orgPdfOptions(null)).toEqual(DEFAULT_PDF_OPTIONS);
+  });
+
+  it('keeps saved values and drops wrongly typed or unknown ones', () => {
+    const o = orgPdfOptions({ pdf_options: { show_tax_column: false, logo: 'data:image/png;base64,AA', font: 'serif', show_notes: 'no', hack: 1 } } as never);
+    expect(o.show_tax_column).toBe(false);
+    expect(o.logo).toBe('data:image/png;base64,AA');
+    expect(o.font).toBe('serif');
+    expect(o.show_notes).toBe(true);
+    expect((o as never as Record<string, unknown>)['hack']).toBeUndefined();
   });
 });

@@ -483,7 +483,8 @@ INSERT INTO `migrations` VALUES
 (3,'0001_01_01_000002_create_jobs_table',1),
 (4,'2019_12_14_000001_create_personal_access_tokens_table',1),
 (5,'2026_01_01_000100_create_accounting_tables',1),
-(6,'2026_11_26_000100_add_pdf_template_to_organizations',1);
+(6,'2026_11_26_000100_add_pdf_template_to_organizations',1),
+(7,'2026_11_27_000100_add_pdf_options_to_organizations',1);
 /*!40000 ALTER TABLE `migrations` ENABLE KEYS */;
 
 --
@@ -514,6 +515,7 @@ CREATE TABLE `organizations` (
   `pdf_template` varchar(20) NOT NULL DEFAULT 'classic',
   `pdf_accent` varchar(7) NOT NULL DEFAULT '#4f46e5',
   `pdf_footer` text DEFAULT NULL,
+  `pdf_options` longtext DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)

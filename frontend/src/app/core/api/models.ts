@@ -21,9 +21,46 @@ export interface Organization {
   pdf_template?: PdfTemplateId | null;
   pdf_accent?: string | null;
   pdf_footer?: string | null;
+  pdf_options?: Partial<PdfOptions> | null;
 }
 
 export type PdfTemplateId = 'classic' | 'modern' | 'minimal' | 'gst';
+
+/** Extra customisation for printed / PDF documents, stored as JSON on the organization. */
+export interface PdfOptions {
+  /** Logo as a data URL (PNG / JPEG / WEBP), resized in the browser before upload. */
+  logo: string | null;
+  logo_position: 'left' | 'right' | 'center';
+  logo_size: 's' | 'm' | 'l';
+  show_org_name: boolean;
+  /** Tagline / extra line printed under the business name. */
+  header_text: string;
+  show_org_address: boolean;
+  show_org_gstin: boolean;
+  show_org_phone: boolean;
+  show_org_email: boolean;
+  /** Custom titles, e.g. "QUOTATION" instead of "ESTIMATE". Empty = default. */
+  title_invoice: string;
+  title_estimate: string;
+  show_customer_gstin: boolean;
+  show_item_description: boolean;
+  show_discount_column: boolean;
+  show_tax_column: boolean;
+  show_amount_words: boolean;
+  show_notes: boolean;
+  show_terms: boolean;
+  show_balance: boolean;
+  show_paid_stamp: boolean;
+  show_signature: boolean;
+  /** Signature / stamp image as a data URL. */
+  signature: string | null;
+  signatory_label: string;
+  /** Small centred line at the very bottom, e.g. "This is a computer generated invoice". */
+  footer_note: string;
+  font: 'sans' | 'serif' | 'mono';
+  font_size: 'compact' | 'normal' | 'large';
+  paper: 'A4' | 'Letter' | 'A5';
+}
 
 export interface User {
   id: number;
